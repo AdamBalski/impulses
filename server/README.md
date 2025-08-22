@@ -17,6 +17,11 @@ pip3 install bcrypt
 TOKEN='...' HASHED_TOKEN='...' python3 run.py
 ```
 ## To rotate token on remote machine (need to trigger app restart separately)
+### This also needs `bcrypt`, so source the venv
 ```
 REMOTE_HOST=ssh_host ./server/token_update.sh
+```
+## To deploy
+```
+REMOTE_HOST='...' TOKEN='...' ./deploy.sh
 ```

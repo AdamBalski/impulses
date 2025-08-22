@@ -15,7 +15,7 @@ EOF
 # write env file on remote
 ssh "$REMOTE_HOST" bash <<EOF
     echo "Updating token..."
-    echo -n $HASHED > ~/.hashed_impulses_token
+    echo -n '$HASHED' > ~/.hashed_impulses_token
     echo "Token updated at \$(date)"
 EOF
 

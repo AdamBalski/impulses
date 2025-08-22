@@ -13,8 +13,9 @@ if [ -z "${REMOTE_HOST:-}" ]; then
 fi
 
 ssh "$REMOTE_HOST" bash <<EOF
+    set -euo pipefail
     echo "==> Killing previous app..."
-    pkill -f 'python3 run.py'
+    pkill -f 'python3 run.py' || true
 
     echo "==> Cloning/updating repo..."
     if [ -d "impulses" ]; then
@@ -29,7 +30,7 @@ ssh "$REMOTE_HOST" bash <<EOF
     fi
 
     echo "==> Starting app..."
-    HASHED_TOKEN=\`cat ~/.hashed_impulses_token\`\
+    HASHED_TOKEN="\`cat ~/.hashed_impulses_token\`"\
         TOKEN='$TOKEN'\
         nohup python3 run.py > stdout 2>&1 &
     disown
