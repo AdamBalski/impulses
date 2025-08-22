@@ -19,9 +19,13 @@ ssh "$REMOTE_HOST" bash <<EOF
     echo "==> Cloning/updating repo..."
     if [ -d "impulses" ]; then
         cd impulses/server && git fetch --all && git reset --hard origin/main
+        source ./venv/bin/activate
     else
         git clone $REPO_URL impulses
         cd impulses/server
+        python3 -m venv venv
+        source ./venv/bin/activate
+        pip3 install bcrypt
     fi
 
     echo "==> Starting app..."

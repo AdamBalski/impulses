@@ -6,7 +6,7 @@ import logging
 import signal
 
 logging.basicConfig(
-    filename=f"./log-{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}",
+    filename="./log-" + str(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")),
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
