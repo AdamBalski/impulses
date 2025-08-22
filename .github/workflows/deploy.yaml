@@ -20,6 +20,6 @@ jobs:
           TOKEN: ${{ secrets.TOKEN }}
           REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
         run: |
-          chmod +x deploy.sh
-          ./deploy.sh
+          chmod +x ./server/deploy.sh
+          ./server/deploy.sh
 
