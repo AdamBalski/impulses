@@ -20,7 +20,7 @@ if [ -z "${REMOTE_USERNAME:-}" ]; then
     exit 1
 fi
 
-ssh "${REMOTE_USENAME}@${REMOTE_HOST}" -p "$REMOTE_PORT" bash <<EOF
+ssh "${REMOTE_USERNAME}@${REMOTE_HOST}" -p "$REMOTE_PORT" bash <<EOF
     set -euo pipefail
     echo "==> Killing previous app..."
     pkill -f 'python3 run.py' || true
