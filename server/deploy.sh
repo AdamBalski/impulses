@@ -15,8 +15,12 @@ if [ -z "${REMOTE_PORT:-}" ]; then
     echo "ERROR: REMOTE_PORT environment variable not set."
     exit 1
 fi
+if [ -z "${REMOTE_USERNAME:-}" ]; then
+    echo "ERROR: REMOTE_USERNAME environment variable not set."
+    exit 1
+fi
 
-ssh "$REMOTE_HOST" -p "$REMOTE_PORT" bash <<EOF
+ssh "${REMOTE_USENAME}@${REMOTE_HOST}" -p "$REMOTE_PORT" bash <<EOF
     set -euo pipefail
     echo "==> Killing previous app..."
     pkill -f 'python3 run.py' || true
