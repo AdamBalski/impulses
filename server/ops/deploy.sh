@@ -28,8 +28,8 @@ ssh "${REMOTE_USERNAME}@${REMOTE_HOST}" -p "$REMOTE_PORT" bash <<EOF
 
     echo "==> Cloning/updating repo..."
     if [ -d "impulses" ]; then
-        git fetch --all && git reset --hard origin/main
         cd impulses/server
+        git fetch --all && git reset --hard origin/main
         source ./venv/bin/activate
     else
         git clone $REPO_URL impulses
