@@ -38,7 +38,6 @@ ssh "${REMOTE_USERNAME}@${REMOTE_HOST}" -p "$REMOTE_PORT" bash <<EOF
         source ./venv/bin/activate
         pip3 install bcrypt
     fi
-    cd src
 
     echo "==> Starting app..."
     HASHED_TOKEN="\`cat ~/.hashed_impulses_token\`"\
