@@ -44,7 +44,7 @@ ssh "${REMOTE_USERNAME}@${REMOTE_HOST}" -p "$REMOTE_PORT" bash <<EOF
         TOKEN='$TOKEN'\
         nohup python3 -m src.run > stdout 2>&1 &
     disown
-    for i in `seq 20`; do
+    for i in \`seq 20\`; do
     server_status=DOWN
         echo "Waiting for /healthz endpoint to report the server is up..."
         if curl -fs http://localhost:8080/health | grep UP; then
