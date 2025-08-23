@@ -36,7 +36,7 @@ ssh "${REMOTE_USERNAME}@${REMOTE_HOST}" -p "$REMOTE_PORT" bash <<EOF
         cd impulses/server
         python3 -m venv venv
         source ./venv/bin/activate
-        pip3 install bcrypt
+        pip3 install bcrypt uvicorn fastapi apscheduler
     fi
 
     echo "==> Starting app..."
@@ -44,17 +44,18 @@ ssh "${REMOTE_USERNAME}@${REMOTE_HOST}" -p "$REMOTE_PORT" bash <<EOF
         TOKEN='$TOKEN'\
         nohup python3 -m src.run > stdout 2>&1 &
     disown
-    for i in \`seq 20\`; do
+
     server_status=DOWN
+    for i in \`seq 20\`; do
         echo "Waiting for /healthz endpoint to report the server is up..."
-        if curl -fs http://localhost:8080/health | grep UP; then
+        if curl -fs http://localhost:8000/healthz | grep UP; then
             server_status=UP
             break
         fi
         sleep 0.5
     done
 
-    if [ \$server_status = UP ]; then
+    if [ "\$server_status" = "UP" ]; then
         echo "Deployment complete at \$(date)"
     else
         echo "Deployment failed at \$(date)"
