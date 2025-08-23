@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 REPO_URL="https://github.com/AdamBalski/impulses"
 
@@ -23,11 +24,12 @@ fi
 ssh "${REMOTE_USERNAME}@${REMOTE_HOST}" -p "$REMOTE_PORT" bash <<EOF
     set -euo pipefail
     echo "==> Killing previous app..."
-    pkill -f 'python3 run.py' || true
+    pkill -f 'python3 -m src.run' || true
 
     echo "==> Cloning/updating repo..."
     if [ -d "impulses" ]; then
-        cd impulses/server && git fetch --all && git reset --hard origin/main
+        git fetch --all && git reset --hard origin/main
+        cd impulses/server
         source ./venv/bin/activate
     else
         git clone $REPO_URL impulses
@@ -36,13 +38,29 @@ ssh "${REMOTE_USERNAME}@${REMOTE_HOST}" -p "$REMOTE_PORT" bash <<EOF
         source ./venv/bin/activate
         pip3 install bcrypt
     fi
+    cd src
 
     echo "==> Starting app..."
     HASHED_TOKEN="\`cat ~/.hashed_impulses_token\`"\
         TOKEN='$TOKEN'\
-        nohup python3 run.py > stdout 2>&1 &
+        nohup python3 -m src.run > stdout 2>&1 &
     disown
-    echo "Deployment complete at \$(date)"
+    for i in `seq 20`; do
+    server_status=DOWN
+        echo "Waiting for /healthz endpoint to report the server is up..."
+        if curl -fs http://localhost:8080/health | grep UP; then
+            server_status=UP
+            break
+        fi
+        sleep 0.5
+    done
+
+    if [ $server_status = UP ]; then
+        echo "Deployment complete at \$(date)"
+    else
+        echo "Deployment failed at \$(date)"
+        false
+    fi
 EOF
 
 echo "Deployed successfully to $REMOTE_HOST"
