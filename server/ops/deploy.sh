@@ -55,7 +55,7 @@ ssh "${REMOTE_USERNAME}@${REMOTE_HOST}" -p "$REMOTE_PORT" bash <<EOF
         sleep 0.5
     done
 
-    if [ $server_status = UP ]; then
+    if [ \$server_status = UP ]; then
         echo "Deployment complete at \$(date)"
     else
         echo "Deployment failed at \$(date)"
