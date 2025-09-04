@@ -14,14 +14,29 @@ cd server
 python3 -m venv venv
 source ./venv/bin/activate
 pip3 install bcrypt
-TOKEN='...' HASHED_TOKEN='...' python3 run.py
+TOKEN='...' HASHED_TOKEN='...' <... other env veriables> python3 run.py
 ```
 ## To rotate token on remote machine (need to trigger app restart separately)
 ### This also needs `bcrypt`, so source the venv
 ```
 REMOTE_HOST=ssh_host ./server/token_update.sh
 ```
-## To deploy
+## To deploy (need env variables and ssh access (keys installed))
 ```
-REMOTE_HOST='...' TOKEN='...' ./deploy.sh
+./deploy.sh
 ```
+## To run directly on local machine (need env variables and the python virtual env)
+```
+python3 -m src.run
+```
+## Env variables
+|variable name|description|is needed for deploy script?|is needed to run directly?|
+|-|-|-|-|
+|`PORT`|port the application should listen on|- [x]|- [x]|
+|`TOKEN`|explained earlier|- [x]|- [x]|
+|`GOOGLE_OAUTH2_CREDS`|google oauth2 client credentials|- [x]|- [x]|
+|`ORIGIN`|protocol + domain + port(if non default, e.g. non `:443` for https)|- [x]|- [x]|
+|`HASHED_TOKEN`|bcrypt-hashed `$TOKEN`|- [ ]|- [x]|
+|`SSH_PORT`|ssh port of the remote machine|- [x] |- [ ]|
+|`SSH_USERNAME`|username on the remote machine|- [x] |- [ ]|
+|`REMOTE_HOST`|remote host to ssh to and deploy the app to|- [x] |- [ ]|

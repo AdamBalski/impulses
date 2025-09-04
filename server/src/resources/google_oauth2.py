@@ -1,0 +1,51 @@
+import json
+import logging
+import httpx
+import fastapi
+import base64
+from src import state
+
+def get_sub(jwt_token: str) -> str:
+    payload = jwt_token.split(".")[1]
+    # fix base64 padding
+    padded = payload + "=" * (-len(payload) % 4)
+    data = json.loads(base64.urlsafe_b64decode(padded))
+    return data["sub"]
+
+def prepare_response_body_for_refresh_token_request(oauth2_creds, code, origin):
+    return {
+        "code": code,
+        "client_id": oauth2_creds["web"]["client_id"],
+        "client_secret": oauth2_creds["web"]["client_secret"],
+        "redirect_uri": origin.rstrip("/") + "/oauth2/google/callback",
+        "grant_type": "authorization_code",
+    }
+
+router = fastapi.APIRouter()
+@router.get("/callback")
+async def oauth2_callback(request: fastapi.Request, code: str, 
+                          state: state.AppState = fastapi.Depends(state.get_state)):
+    oauth2_state = state.get_google_oauth2_state()
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            oauth2_state.get_app_creds()["web"]["token_uri"],
+            data=prepare_response_body_for_refresh_token_request(
+                oauth2_state.get_app_creds(), 
+                code,
+                state.get_origin())
+        )
+
+    if resp.status_code != 200:
+        raise fastapi.HTTPException(status_code=400, detail="The supplied code was probably incorrect. Google returned non 200OK response.")
+
+    token_data = resp.json()
+    print(token_data["id_token"])
+    print(token_data.get("refresh_token"))
+    print(json.dumps(token_data, indent=2))
+    if (id_token := token_data["id_token"]) and (refresh_token := token_data.get("refresh_token")):
+        # id_token is a JWT, sub is an immutable google acc identifier
+        user_id = get_sub(id_token)
+        logging.debug(f"Setting gOAuth2 gCal refresh token for user: {user_id}. Refresh token length: {len(refresh_token)}")
+        oauth2_state.get_tokens(user_id).set_refresh_token(refresh_token)
+        return {"status": "ok"}
+    raise fastapi.HTTPException(status_code=500, detail="Internal Server Error")
