@@ -32,11 +32,11 @@ python3 -m src.run
 ## Env variables
 |variable name|description|is needed for deploy script?|is needed to run directly?|
 |-|-|-|-|
-|`PORT`|port the application should listen on|\u2714|\u2714|
-|`TOKEN`|explained earlier|\u2714|\u2714|
-|`GOOGLE_OAUTH2_CREDS`|google oauth2 client credentials|\u2714|\u2714|
-|`ORIGIN`|protocol + domain + port(if non default, e.g. non `:443` for https)|\u2714|\u2714|
-|`HASHED_TOKEN`|bcrypt-hashed `$TOKEN`|\u2718|\u2714|
-|`SSH_PORT`|ssh port of the remote machine|\u2714 |\u2718|
-|`SSH_USERNAME`|username on the remote machine|\u2714 |\u2718|
-|`REMOTE_HOST`|remote host to ssh to and deploy the app to|\u2714 |\u2718|
+|`PORT`|port the application should listen on|✔|✔|
+|`TOKEN`|explained earlier|✔|✔|
+|`GOOGLE_OAUTH2_CREDS`|google oauth2 client credentials|✔|✔|
+|`ORIGIN`|protocol + domain + port(if non default, e.g. `443` for https)|✔|✔|
+|`HASHED_TOKEN`|bcrypt-hashed `$TOKEN`|✘|✔|
+|`SSH_PORT`|ssh port of the remote machine|✔ |✘|
+|`SSH_USERNAME`|username on the remote machine|✔ |✘|
+|`REMOTE_HOST`|remote host to ssh to and deploy the app to|✔ |✘|
