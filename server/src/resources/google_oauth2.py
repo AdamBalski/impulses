@@ -1,9 +1,11 @@
 import json
+import urllib
 import logging
 import httpx
 import fastapi
 import base64
 from src import state
+from fastapi import responses
 
 def get_sub(jwt_token: str) -> str:
     payload = jwt_token.split(".")[1]
@@ -49,3 +51,26 @@ async def oauth2_callback(request: fastapi.Request, code: str,
         oauth2_state.get_tokens(user_id).set_refresh_token(refresh_token)
         return {"status": "ok"}
     raise fastapi.HTTPException(status_code=500, detail="Internal Server Error")
+
+@router.get("/auth")
+async def redirect_to_google(request: fastapi.Request, state: state.AppState = fastapi.Depends(state.get_state)):
+    client_creds = state.get_google_oauth2_state().get_app_creds()
+    scopes = [
+        # job for polling google calendar events
+        "https://www.googleapis.com/auth/calendar.readonly",
+        # association of google account id to the refresh token
+        "https://www.googleapis.com/auth/userinfo.email"
+    ]
+
+    base_url = "https://accounts.google.com/o/oauth2/auth"
+    params = {
+        "response_type": "code",
+        "client_id": client_creds["web"]["client_id"],
+        "redirect_uri": state.get_origin() + "/oauth2/google/callback",
+        "scope": " ".join(scopes),
+        "access_type": "offline",
+        "prompt": "consent"
+    }
+
+    return responses.RedirectResponse(f"{base_url}?{urllib.parse.urlencode(params)}")
+

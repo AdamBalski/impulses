@@ -1,16 +1,26 @@
-from contextlib import asynccontextmanager
-import json
-import os
-from apscheduler.schedulers.background import BackgroundScheduler
-import fastapi
-from src.resources import google_oauth2
-from src import state
-from src import health
-import uvicorn
-import datetime
-import bcrypt
 import asyncio
+import bcrypt
+import datetime
+import fastapi
+import json
 import logging
+import os
+import pathlib
+import sys
+import uvicorn
+from apscheduler.schedulers.background import BackgroundScheduler
+from contextlib import asynccontextmanager
+
+from src import health
+from src import state
+from src.auth import auth
+from src.dao import DataDao
+from src.db import Dao
+from src.resources import data
+from src.resources import google_oauth2
+from src.job import job
+from src.job import heartbeat_job
+from src.job import gcal_polling_job
 
 def setup_logging():
     log_filename = "./log-" + str(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
@@ -19,6 +29,8 @@ def setup_logging():
         level=logging.DEBUG,
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
+    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+
     os.symlink(log_filename, log_filename + "_link")
     os.replace(log_filename + "_link", "./log-latest")
 setup_logging()
@@ -40,9 +52,10 @@ def get_token_from_env():
 def shutdown_handler(status: health.AppHealth):
     status.status = health.HealthStatus.STOPPING
     logging.info(f"Shutting down...")
-def schedule_jobs():
+def schedule_jobs(jobs: list[job.Job]):
     scheduler = BackgroundScheduler()
-    scheduler.add_job(lambda: logging.info("heartbeat"), 'cron', second='*/5')
+    for job_obj in jobs:
+        scheduler.add_job(job.runner(job_obj), 'interval', seconds=job_obj.interval())
     scheduler.start()
 
 def main():
@@ -50,21 +63,28 @@ def main():
     token = get_token_from_env()
     google_oauth2_creds = json.loads(get_from_env_or_fail("GOOGLE_OAUTH2_CREDS"))
     status = health.AppHealth(health.HealthStatus.UP)
+    db_dao = Dao.PersistentDao(pathlib.Path("./data-store"))
 
     app_state = state.set_state(state.AppState(
             status=status,
             app_token=token,
             google_oauth2_state=state.GoogleOAuth2State(google_oauth2_creds),
             origin=get_from_env_or_fail("ORIGIN")
-    ))
+    )) \
+        .provide_obj(DataDao.DataDao(db_dao)) \
+        .register_job(heartbeat_job.HeartbeatJob) \
+        .register_job(gcal_polling_job.GCalPollingJob)
+
 
     @asynccontextmanager
     async def lifespan(_: fastapi.FastAPI):
-        schedule_jobs()
+        schedule_jobs(app_state.get_jobs())
         yield
         shutdown_handler(status)
     app = fastapi.FastAPI(lifespan=lifespan, dependencies = [fastapi.Depends(state.get_state)])
     app.include_router(google_oauth2.router, prefix="/oauth2/google")
+    app.include_router(data.router, prefix="/data", dependencies=[fastapi.Depends(auth.check_token),
+                                                                  fastapi.Depends(state.get_state)])
 
 
     @app.get("/healthz")

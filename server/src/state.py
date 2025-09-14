@@ -1,3 +1,5 @@
+import fastapi
+from src.job import job
 from src import health
 import typing
 import collections
@@ -19,6 +21,7 @@ class GoogleOAuth2State:
     def get_tokens(self, user_id):
         return self.user_id_to_tokens_map[user_id]
 
+T = typing.TypeVar("T")
 class AppState:
     def __init__(self, 
                  status: health.AppHealth,
@@ -29,6 +32,8 @@ class AppState:
         self.app_token = app_token
         self.google_oauth2_state = google_oauth2_state
         self.origin = origin
+        self.obj_registry = {}
+        self.jobs: list[job.Job] = []
     def get_status(self) -> health.AppHealth:
         return self.status
     def get_app_token(self) -> str:
@@ -37,6 +42,21 @@ class AppState:
         return self.google_oauth2_state
     def get_origin(self) -> str:
         return self.origin
+    def provide_obj_as(self, cls: typing.Type[T], obj: T) -> typing.Self:
+        self.obj_registry[cls] = obj
+        return self
+    def provide_obj(self, obj: object) -> typing.Self:
+        self.obj_registry[type(obj)] = obj
+        return self
+    def get_obj(self, cls: typing.Type[T]) -> T:
+        if cls not in self.obj_registry:
+            raise Exception(f"{cls} object not in registry")
+        return self.obj_registry[cls]
+    def register_job(self, job_constructor: typing.Callable[["AppState"], job.Job]) -> typing.Self:
+        self.jobs.append(job_constructor(self))
+        return self
+    def get_jobs(self):
+        return self.jobs
 
 _app_state: typing.Optional[AppState]
 
@@ -49,3 +69,9 @@ def get_state() -> AppState:
     if _app_state is None:
         raise Exception("State not yet loaded")
     return _app_state
+
+def injected(cls: typing.Type[T]) -> T:
+    def getter(state: AppState = fastapi.Depends(get_state)) -> T:
+        return state.get_obj(cls)
+    return fastapi.Depends(getter)
+
