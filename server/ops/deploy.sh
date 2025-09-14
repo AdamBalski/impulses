@@ -41,7 +41,7 @@ ssh "${REMOTE_USERNAME}@${REMOTE_HOST}" -p "$REMOTE_PORT" bash <<EOF
     echo "==> Cloning/updating repo..."
     [ -d "impulses" ] || git clone $REPO_URL impulses
     cd impulses/server
-    [ -d "venv"] || python3 -m venv venv
+    [ -d "venv" ] || python3 -m venv venv
     pip3 install bcrypt uvicorn fastapi apscheduler httpx
     git fetch --all && git reset --hard origin/main
     source ./venv/bin/activate
