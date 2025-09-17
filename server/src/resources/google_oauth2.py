@@ -41,9 +41,6 @@ async def oauth2_callback(request: fastapi.Request, code: str,
         raise fastapi.HTTPException(status_code=400, detail="The supplied code was probably incorrect. Google returned non 200OK response.")
 
     token_data = resp.json()
-    print(token_data["id_token"])
-    print(token_data.get("refresh_token"))
-    print(json.dumps(token_data, indent=2))
     if (id_token := token_data["id_token"]) and (refresh_token := token_data.get("refresh_token")):
         # id_token is a JWT, sub is an immutable google acc identifier
         user_id = get_sub(id_token)

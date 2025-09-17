@@ -110,5 +110,5 @@ if __name__ == "__main__":
         main()
     except BaseException:
         logging.exception(f"Exception raised, quitting...")
-        exit(1)
+        raise
 
