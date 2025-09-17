@@ -90,11 +90,22 @@ class PersistentDao:
             self.locks.release(obj_name)
 
 
-    def read(self, obj_name, type_obj: Type):
-        if obj_name in self.cache:
-            return self.cache[obj_name]
+    def read(self, obj_name: str, type_obj: Type):
+        cached = self.cache[obj_name] if obj_name in self.cache else None
+        if cached != None:
+            return cached
         self.cache[obj_name] = result = type_obj.deserialize(self.get_path(obj_name))
         return result
+
+    def delete(self, obj_name):
+        logging.debug(f"Deleting {obj_name} from the data store")
+        self.cache[obj_name] = None
+        try:
+            os.remove(self.get_path(obj_name))
+        except FileNotFoundError:
+            # TODO: find a way to not have to catch the exception here, probably an optional 
+            #       argument on the remove method (currently have no Internet)
+            pass
 
     def get_path(self, obj_name: str) -> pathlib.Path:
         return self.storage_dir / "persistent_obj_dir" / obj_name
@@ -109,5 +120,7 @@ class TypedPersistentDao(typing.Generic[T]):
         return self.dao.flush(obj_name, value, self.type_obj)
     def read(self, obj_name: str) -> T:
         return self.dao.read(obj_name, self.type_obj)
+    def delete(self, obj_name: str) -> None:
+        return self.dao.delete(obj_name)
     def locked_access(self, obj_name) -> typing.ContextManager[typing.Tuple[T, typing.Callable[[T], None]]]:
         return self.dao.locked_access(obj_name, self.type_obj)

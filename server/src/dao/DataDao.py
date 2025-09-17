@@ -52,4 +52,9 @@ class DataDao:
         return self.metric_names_dao.read("metric_names")
     def get_metric_by_metric_name(self, metric_name: str):
         return self.metric_dao.read(f"data#{metric_name}")
+    def delete_metric_name(self, metric_name: str):
+        with self.metric_names_dao.locked_access(f"metric_names") as (__metric_names, set_metric_names):
+            metric_names = __metric_names.root
+            set_metric_names(StringsListDto([name for name in metric_names if name == metric_name]))
+        return self.metric_dao.delete(f"data#{metric_name}")
 

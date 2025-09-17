@@ -22,3 +22,6 @@ class ImpulsesClient:
         payload = datapoints.to_api_obj()
         resp = requests.post(f"{self.url}/data/{metric_name}", headers=self.headers, json=payload)
         resp.raise_for_status()
+    def delete_metric_name(self, metric_name: str):
+        resp = requests.delete(f"{self.url}/data/{metric_name}", headers=self.headers)
+        resp.raise_for_status()

@@ -41,3 +41,9 @@ def post_datapoints_for_metric_name(metric_name: str, payload: typing.List[DataD
     assert_metric_name_validity(metric_name)
     assert_dps_validity(payload)
     dao.add(metric_name, payload)
+
+@router.delete("/{metric_name}")
+def delete_metric_name(metric_name: str, dao = state.injected(DataDao.DataDao)):
+    assert_metric_name_validity(metric_name)
+    dao.delete_metric_name(metric_name)
+
