@@ -1,5 +1,5 @@
 import abc
-from typing import Mapping, Tuple, Optional, Callable
+from typing import Mapping, Tuple, Optional, Callable, Self
 
 class Datapoint:
     def __init__(self, timestamp: int, value: float, dimensions: Optional[Mapping[str, str]] = None):
@@ -33,6 +33,8 @@ class EvaluatedImpulse(abc.ABC):
     @abc.abstractmethod
     def get_init_val(self) -> float:
         pass
+    def as_dp_series(self) -> "DatapointSeries":
+        raise Exception("Not a models.DatapointSeries")
 
 class DatapointSeries(EvaluatedImpulse):
     def __init__(self, series = None, init_val = 0.0):
@@ -40,8 +42,10 @@ class DatapointSeries(EvaluatedImpulse):
             series = []
         self.series = series
         self.init_val = init_val
+    def as_dp_series(self) -> Self:
+        return self
     def time_at(self, idx: int) -> int:
-        return self.series[idx].unix_time
+        return self.series[idx].timestamp
     def value_at(self, idx: int) -> float:
         return self.series[idx].value
     def get_init_val(self) -> float:
@@ -55,7 +59,7 @@ class DatapointSeries(EvaluatedImpulse):
     def is_constant(self) -> bool:
         return False
     def decompose(self):
-        return [dp.unix_time for dp in self.series], [dp.value for dp in self.series]
+        return [dp.timestamp for dp in self.series], [dp.value for dp in self.series]
     def filter(self, predicate: Callable[[Datapoint], bool]) -> EvaluatedImpulse:
         return DatapointSeries([dp for dp in self.series if predicate(dp)], self.init_val)
     def map(self, mapping_func: Callable[[Datapoint], Datapoint]) -> EvaluatedImpulse:
