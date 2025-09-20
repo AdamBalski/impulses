@@ -24,6 +24,17 @@ def prepare_response_body_for_refresh_token_request(oauth2_creds, code, origin):
         "grant_type": "authorization_code",
     }
 
+def construct_credentials(access_token, refresh_token, oauth2_state: state.GoogleOAuth2State, scopes):
+    creds = oauth2_state.get_app_creds()
+    return credentials.Credentials(
+        token=access_token,
+        refresh_token=refresh_token,
+        token_uri=creds["web"]["token_uri"],
+        client_id=creds["web"]["client_id"],
+        client_secret=creds["web"]["client_secret"],
+        scopes=scopes,
+    )
+
 router = fastapi.APIRouter()
 @router.get("/callback")
 async def oauth2_callback(request: fastapi.Request, code: str, 
@@ -41,18 +52,19 @@ async def oauth2_callback(request: fastapi.Request, code: str,
     try:
         resp.raise_for_status()
         token_data = resp.json()
-        creds = credentials.Credentials.from_authorized_user_info(token_data)
-        stripped_creds = creds.to_json(strip=["refresh_token", "access_token"])
-        logging.debug(f"Setting gOAuth2 gCal credentials. Creds: {stripped_creds}")
-        if (id_token := token_data["id_token"]):
+        if (id_token := token_data["id_token"]) and (refresh_token := token_data.get("refresh_token")):
             # id_token is a JWT, sub is an immutable google acc identifier
+            creds = construct_credentials(token_data.get("access_token"),
+                                          token_data.get("refresh_token"),
+                                          oauth2_state,
+                                          token_data.get("scopes"))
             user_id = get_sub(id_token)
-            logging.debug(f"Setting gOAuth2 gCal credentials for user: {user_id}. Creds: {stripped_creds}")
+            stripped_creds = creds.to_json(strip=["access_token", "refresh_token"])
+            logging.debug(f"Setting gOAuth2 gCal creds for user: {user_id}. Creds: {stripped_creds}")
             oauth2_state.get_tokens(user_id).set_creds(creds)
             return {"status": "ok"}
     except Exception as e:
-        logging.error("An error occurred at refresh token retrieval", e)
-        raise
+        logging.error("Caught an error during oauth2 code for token exchange", e)
     raise fastapi.HTTPException(status_code=500, detail="Internal Server Error")
 
 @router.get("/auth")
