@@ -59,7 +59,8 @@ async def oauth2_callback(request: fastapi.Request, code: str,
                                           oauth2_state,
                                           token_data.get("scopes"))
             user_id = get_sub(id_token)
-            stripped_creds = creds.to_json(strip=["access_token", "refresh_token"])
+            # todo: insecure: stripping should be opt-in instead of opt-out
+            stripped_creds = creds.to_json(strip=["access_token", "refresh_token", "token", "client_secret"])
             logging.debug(f"Setting gOAuth2 gCal creds for user: {user_id}. Creds: {stripped_creds}")
             oauth2_state.get_tokens(user_id).set_creds(creds)
             return {"status": "ok"}
