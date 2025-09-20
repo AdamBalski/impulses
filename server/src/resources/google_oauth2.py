@@ -42,10 +42,11 @@ async def oauth2_callback(request: fastapi.Request, code: str,
         resp.raise_for_status()
         token_data = resp.json()
         creds = credentials.Credentials.from_authorized_user_info(token_data)
+        stripped_creds = creds.to_json(strip=["refresh_token", "access_token"])
+        logging.debug(f"Setting gOAuth2 gCal credentials. Creds: {stripped_creds}")
         if (id_token := token_data["id_token"]):
             # id_token is a JWT, sub is an immutable google acc identifier
             user_id = get_sub(id_token)
-            stripped_creds = creds.to_json(strip=["refresh_token", "access_token"])
             logging.debug(f"Setting gOAuth2 gCal credentials for user: {user_id}. Creds: {stripped_creds}")
             oauth2_state.get_tokens(user_id).set_creds(creds)
             return {"status": "ok"}
