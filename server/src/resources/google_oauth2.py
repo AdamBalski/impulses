@@ -42,14 +42,18 @@ async def oauth2_callback(request: fastapi.Request, code: str,
         raise fastapi.HTTPException(status_code=400, detail="The supplied code was probably incorrect. Google returned non 200OK response.")
 
     token_data = resp.json()
-    creds = credentials.Credentials.from_authorized_user_info(token_data)
-    if (id_token := token_data["id_token"]):
-        # id_token is a JWT, sub is an immutable google acc identifier
-        user_id = get_sub(id_token)
-        stripped_creds = creds.to_json(strip=["refresh_token", "access_token"])
-        logging.debug(f"Setting gOAuth2 gCal credentials for user: {user_id}. Creds: {stripped_creds}")
-        oauth2_state.get_tokens(user_id).set_creds(creds)
-        return {"status": "ok"}
+    try:
+        creds = credentials.Credentials.from_authorized_user_info(token_data)
+        if (id_token := token_data["id_token"]):
+            # id_token is a JWT, sub is an immutable google acc identifier
+            user_id = get_sub(id_token)
+            stripped_creds = creds.to_json(strip=["refresh_token", "access_token"])
+            logging.debug(f"Setting gOAuth2 gCal credentials for user: {user_id}. Creds: {stripped_creds}")
+            oauth2_state.get_tokens(user_id).set_creds(creds)
+            return {"status": "ok"}
+    except Exception as e:
+        logging.error("An error occurred at refresh token retrieval", e)
+        raise
     raise fastapi.HTTPException(status_code=500, detail="Internal Server Error")
 
 @router.get("/auth")
