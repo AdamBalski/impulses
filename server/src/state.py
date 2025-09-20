@@ -3,10 +3,16 @@ from src.job import job
 from src import health
 import typing
 import collections
+from google.oauth2 import credentials
 
 class Tokens:
     def __init__(self):
         self.refresh_token: typing.Optional[str] = None
+        self.creds: typing.Optional[credentials.Credentials] = None
+    def set_creds(self, creds: credentials.Credentials):
+        self.creds = creds
+    def get_creds(self):
+        return self.creds
     def set_refresh_token(self, token: typing.Optional[str]):
         self.refresh_token = token
     def get_refresh_token(self) -> typing.Optional[str]:

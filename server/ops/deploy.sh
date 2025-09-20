@@ -44,7 +44,8 @@ ssh "${REMOTE_USERNAME}@${REMOTE_HOST}" -p "$REMOTE_PORT" bash <<EOF
     [ -d "venv" ] || python3 -m venv venv
     git fetch --all && git reset --hard origin/main
     source ./venv/bin/activate
-    pip3 install bcrypt uvicorn fastapi apscheduler httpx
+    pip3 install --upgrade bcrypt uvicorn fastapi apscheduler httpx
+    pip3 install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
 
     echo "==> Starting app..."
     # the last python3 parameter is not used by the app, 

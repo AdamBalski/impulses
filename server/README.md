@@ -14,6 +14,7 @@ cd server
 python3 -m venv venv
 source ./venv/bin/activate
 pip3 install bcrypt
+pip3 install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
 TOKEN='...' HASHED_TOKEN='...' <... other env veriables> python3 run.py
 ```
 ## To rotate token on remote machine (need to trigger app restart separately)

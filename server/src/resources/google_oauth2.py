@@ -6,6 +6,7 @@ import fastapi
 import base64
 from src import state
 from fastapi import responses
+from google.oauth2 import credentials
 
 def get_sub(jwt_token: str) -> str:
     payload = jwt_token.split(".")[1]
@@ -41,11 +42,13 @@ async def oauth2_callback(request: fastapi.Request, code: str,
         raise fastapi.HTTPException(status_code=400, detail="The supplied code was probably incorrect. Google returned non 200OK response.")
 
     token_data = resp.json()
-    if (id_token := token_data["id_token"]) and (refresh_token := token_data.get("refresh_token")):
+    creds = credentials.Credentials.from_authorized_user_info(token_data)
+    if (id_token := token_data["id_token"]):
         # id_token is a JWT, sub is an immutable google acc identifier
         user_id = get_sub(id_token)
-        logging.debug(f"Setting gOAuth2 gCal refresh token for user: {user_id}. Refresh token length: {len(refresh_token)}")
-        oauth2_state.get_tokens(user_id).set_refresh_token(refresh_token)
+        stripped_creds = creds.to_json(strip=["refresh_token", "access_token"])
+        logging.debug(f"Setting gOAuth2 gCal credentials for user: {user_id}. Creds: {stripped_creds}")
+        oauth2_state.get_tokens(user_id).set_creds(creds)
         return {"status": "ok"}
     raise fastapi.HTTPException(status_code=500, detail="Internal Server Error")
 
