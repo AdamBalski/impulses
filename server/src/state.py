@@ -1,22 +1,48 @@
+import datetime
 import fastapi
+from google.auth.transport import requests
 from src.job import job
 from src import health
 import typing
 import collections
 from google.oauth2 import credentials
+import threading
 
 class Tokens:
     def __init__(self):
-        self.refresh_token: typing.Optional[str] = None
         self.creds: typing.Optional[credentials.Credentials] = None
+        self.mu = threading.Lock()
+    def refresh_if_needed(self):
+        """
+        Refresh google oauth2 credentials if needed and the creds are present. 
+        This is a thin wrapper around google.oauth2.credentials.Credentials#refresh. 
+        Also checks if a refresh is needed prior to making the request.
+        Uses a mutex for additional synchronization as the google's refresh method is implemented
+        in a non-thread-safe manner
+        """
+        with self.mu:
+            if self.creds == None:
+                return
+            # TODO: clean-up
+            # None when first fetched due to the weird  
+            # (flow begins with manually prepared request and 
+            # creds are imported with a bare constructor)
+            # way it is done, see resources/google_oauth2.py
+            if self.creds.expiry \
+                    or (datetime.datetime.now() - typing.cast(datetime.datetime, self.creds.expiry)) \
+                    >= datetime.timedelta(minutes=1):
+                # not expired or expiry sooner than a minute away 
+                # (we want the token to be valid for at least the next minute so we can make requests)
+                return
+            self.creds.refresh(requests.Request())
     def set_creds(self, creds: credentials.Credentials):
         self.creds = creds
-    def get_creds(self):
-        return self.creds
-    def set_refresh_token(self, token: typing.Optional[str]):
-        self.refresh_token = token
-    def get_refresh_token(self) -> typing.Optional[str]:
-        return self.refresh_token
+    def get_valid_creds(self) -> credentials.Credentials:
+        self.refresh_if_needed()
+        res = self.creds
+        if res == None:
+            raise Exception("GOAuth2 credentials are absent")
+        return res
 
 class GoogleOAuth2State:
     def __init__(self, app_oauth2_creds):
