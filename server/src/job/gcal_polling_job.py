@@ -38,7 +38,7 @@ class GCalPollingJob(job.Job):
         self.google_oauth2_state = state.get_google_oauth2_state()
         self.mu = threading.Lock()
     def interval(self) -> int:
-        return 30
+        return 120
     def poll_for_user(self, user_id: str, tokens: state.Tokens):
         logging.debug(f"Fetching gCal events for user {user_id}")
         # tokens are fresh here (refreshed ad-hoc during get_valid_creds)
