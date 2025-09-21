@@ -72,6 +72,7 @@ def main():
             origin=get_from_env_or_fail("ORIGIN")
     )) \
         .provide_obj(DataDao.DataDao(db_dao)) \
+        .provide_obj(db_dao) \
         .register_job(heartbeat_job.HeartbeatJob) \
         .register_job(gcal_polling_job.GCalPollingJob)
 
