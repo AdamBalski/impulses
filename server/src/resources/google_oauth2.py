@@ -73,7 +73,7 @@ async def oauth2_callback(request: fastapi.Request, code: str,
             creds = construct_credentials(token_data.get("access_token"),
                                           token_data.get("refresh_token"),
                                           oauth2_state,
-                                          scopes=scopes))
+                                          scopes=scopes)
             user_id = get_sub(id_token)
             # todo: insecure: stripping should be opt-in instead of opt-out
             stripped_creds = creds.to_json(strip=["access_token", "refresh_token", "token", "client_secret"])
