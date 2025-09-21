@@ -20,6 +20,10 @@ def assert_dp_validity(dp: DataDao.DatapointDto):
     for dim_key in dp.dimensions:
         if not is_symbol_valid(dim_key):
             raise_invalid_symbol_exception("Dimension key", dim_key)
+def assert_metric_name_is_writable(metric_name: str):
+    if metric_name.startswith("imp."):
+        raise fastapi.HTTPException(status_code=403, 
+                                    detail=f"Can't write to a metric name that starts with 'imp.'")
 def assert_dps_validity(dps: typing.List[DataDao.DatapointDto]):
     for dp in dps:
         assert_dp_validity(dp)
@@ -39,11 +43,13 @@ def get_metric_by_metric_name(metric_name: str, dao = state.injected(DataDao.Dat
 def post_datapoints_for_metric_name(metric_name: str, payload: typing.List[DataDao.DatapointDto],
                                     dao = state.injected(DataDao.DataDao)):
     assert_metric_name_validity(metric_name)
+    assert_metric_name_is_writable(metric_name)
     assert_dps_validity(payload)
     dao.add(metric_name, payload)
 
 @router.delete("/{metric_name}")
 def delete_metric_name(metric_name: str, dao = state.injected(DataDao.DataDao)):
     assert_metric_name_validity(metric_name)
+    assert_metric_name_is_writable(metric_name)
     dao.delete_metric_name(metric_name)
 

@@ -1,9 +1,13 @@
+import collections
+from contextlib import nullcontext
 import datetime
 import threading
 import typing
 import logging
 import pydantic
+import re
 
+from src.dao import DataDao
 from src.db import Dao
 from src.job import job
 from src import state
@@ -15,14 +19,14 @@ class Event(pydantic.BaseModel):
     event_id: str
     summary: str
     description: str
-    start: datetime.datetime
-    end: datetime.datetime
+    start: str
+    end: str
 class GCalEventsPerUserData(pydantic.BaseModel):
     events: typing.Dict[str, Event]
     lastSyncToken: typing.Optional[str] = None
     @staticmethod
     def empty():
-        return GCalEventsPerUserData({}, None)
+        return GCalEventsPerUserData(events={}, lastSyncToken=None)
 GCalEventsPerUserDataType = Dao.Type.for_pydantic_model(GCalEventsPerUserData, GCalEventsPerUserData.empty)
 
 class GCalPollingJob(job.Job):
@@ -30,6 +34,7 @@ class GCalPollingJob(job.Job):
         super().__init__(state)
         db_dao = state.get_obj(Dao.PersistentDao)
         self.events_dao = Dao.TypedPersistentDao(db_dao, GCalEventsPerUserDataType)
+        self.data_dao = state.get_obj(DataDao.DataDao)
         self.google_oauth2_state = state.get_google_oauth2_state()
         self.mu = threading.Lock()
     def poll_for_user(self, user_id: str, tokens: state.Tokens):
@@ -46,6 +51,7 @@ class GCalPollingJob(job.Job):
         self.apply_changes(data, changes)
 
         self.events_dao.flush(f"gcal_events_data#{user_id}", data)
+        self.synchronize_metrics(data)
         pass
     def run(self):
         try:
@@ -58,6 +64,40 @@ class GCalPollingJob(job.Job):
                     logging.warning(f"Exception happened during gcal polling for user: {user_id}", e)
         finally:
             self.mu.release()
+    def synchronize_metrics(self, data: GCalEventsPerUserData):
+        metrics_dps = collections.defaultdict(lambda: [])
+        for eid, event in data.events.items():
+            if not event.startswith("#!"):
+                continue
+            dims = { "src": eid, "activity": event.summary[2:] }
+            start = datetime.datetime.fromisoformat(event.start)
+            end = datetime.datetime.fromisoformat(event.ned)
+            duration_millis = (end - start) / datetime.timedelta(milliseconds=1)
+            timestamp_millis = int(1000 * start.timestamp())
+            custom_values = {}
+
+            for line in event.description.splitlines():
+                valid_symbol = r" *([A-Za-z0-9._]+) *"
+                if m := re.match(f"{valid_symbol}:{valid_symbol}", line):
+                    dims[m.group(1)] = m.group(2)
+                elif m := re.match(f"{valid_symbol}= *([0-9.]*) *", line):
+                    try:
+                        custom_values[m.group(1)] = float(m.group(2))
+                    except ValueError as e:
+                        logging.debug("Couldn't turn a metric value from description to float", e)
+            new_dp = DataDao.DatapointDto(timestamp=timestamp_millis, 
+                                          dimensions=dims, 
+                                          value=duration_millis)
+            metrics_dps["imp.events.duration"].append(new_dp)
+            for name, value in custom_values.items():
+                new_dp = DataDao.DatapointDto(timestamp=timestamp_millis,
+                                              dimensions=dims,
+                                              value=value)
+                metrics_dps["imp.events.custom." + name].append(new_dp)
+        for metric_name, dps_list in metrics_dps.items():
+            self.data_dao.delete_metric_name(metric_name)
+            self.data_dao.add(metric_name, dps_list)
+
     def poll_events(self, creds: credentials.Credentials, last_sync_token: typing.Optional[str]) \
             -> typing.Optional[list[dict]]:
         """
@@ -70,7 +110,7 @@ class GCalPollingJob(job.Job):
             nextPageToken = None
             nextSyncToken = None
             while not nextSyncToken:
-                curr_res = gcal_client.list(calendarId="primary", 
+                curr_res = gcal_client.events().list(calendarId="primary", 
                                             pageToken=nextPageToken, 
                                             syncToken=last_sync_token).execute()
                 for event in curr_res.get("items", []):
@@ -82,6 +122,7 @@ class GCalPollingJob(job.Job):
                 # should send the last sync token only on the first request
                 last_sync_token = None
             logging.debug(f"Fetched {len(result)} events")
+            return result
         except Exception as e:
             logging.warning("Exception ocurred during actual events fetching", e)
     def apply_changes(self, data: GCalEventsPerUserData, changes: typing.Optional[list[dict]]):
@@ -91,6 +132,7 @@ class GCalPollingJob(job.Job):
             data.lastSyncToken = None
             return
         for event in changes:
+            print(event)
             status = event["status"]
             eid = event["id"]
             # tombstone event
@@ -99,9 +141,15 @@ class GCalPollingJob(job.Job):
                 continue
             summary = event["summary"]
             description = event.get("description", "")
-            start = event["start"]["dateTime"]
-            end = event["end"]["dateTime"]
-            data.events[eid] = Event(eid, summary, description, start, end)
+            start = self.get_date(event["start"])
+            end = self.get_date(event["end"])
+            data.events[eid] = Event(event_id=eid, summary=summary, description=description, start=start, end=end)
+    def get_date(self, gcal_api_time_info):
+        if "date" in gcal_api_time_info:
+            # TODO: default timezone should be configurable
+            return gcal_api_time_info["date"] + "T00:00:00+00:00"
+        return gcal_api_time_info["dateTime"]
+
 
     def safe_release_lock(self):
         try:

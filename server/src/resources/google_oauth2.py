@@ -43,7 +43,7 @@ def construct_credentials(access_token, refresh_token, oauth2_state: state.Googl
         scopes=scopes,
     )
 
-def check_for_scopes(scopes: typing.List[str]):
+def check_for_scopes(scopes: list[str]):
     for scope in SCOPES:
         if scope not in scopes:
             raise fastapi.HttpException(status_code=400, details=f"Not all scopes included. Needed scopes: {SCOPES}")
@@ -68,7 +68,7 @@ async def oauth2_callback(request: fastapi.Request, code: str,
         token_data = resp.json()
         if (id_token := token_data["id_token"]) and (refresh_token := token_data.get("refresh_token")):
             # id_token is a JWT, sub is an immutable google acc identifier
-            scopes = token_data.get("scopes")
+            scopes = token_data.get("scope").split(" ")
             check_for_scopes(scopes)
             creds = construct_credentials(token_data.get("access_token"),
                                           token_data.get("refresh_token"),

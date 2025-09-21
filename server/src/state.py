@@ -29,7 +29,7 @@ class Tokens:
             # creds are imported with a bare constructor)
             # way it is done, see resources/google_oauth2.py
             if self.creds.expiry \
-                    or (datetime.datetime.now() - typing.cast(datetime.datetime, self.creds.expiry)) \
+                    and (datetime.datetime.now() - typing.cast(datetime.datetime, self.creds.expiry)) \
                     >= datetime.timedelta(minutes=1):
                 # not expired or expiry sooner than a minute away 
                 # (we want the token to be valid for at least the next minute so we can make requests)
