@@ -72,7 +72,7 @@ class PersistentDao:
         self.cache = {}
         self.tmp_name_counter = AtomicCounter()
         self.locks = PerStringLock()
-        
+
     def flush(self, obj_name, value, type_obj: Type):
         logging.debug(f"Writing {type_obj} {obj_name} to data store")
         self.cache[obj_name] = value
@@ -103,8 +103,6 @@ class PersistentDao:
         try:
             os.remove(self.get_path(obj_name))
         except FileNotFoundError:
-            # TODO: find a way to not have to catch the exception here, probably an optional 
-            #       argument on the remove method (currently have no Internet)
             pass
 
     def get_path(self, obj_name: str) -> pathlib.Path:
