@@ -37,6 +37,8 @@ class GCalPollingJob(job.Job):
         self.data_dao = state.get_obj(DataDao.DataDao)
         self.google_oauth2_state = state.get_google_oauth2_state()
         self.mu = threading.Lock()
+    def interval(self) -> int:
+        return 30
     def poll_for_user(self, user_id: str, tokens: state.Tokens):
         logging.debug(f"Fetching gCal events for user {user_id}")
         # tokens are fresh here (refreshed ad-hoc during get_valid_creds)
@@ -52,7 +54,6 @@ class GCalPollingJob(job.Job):
 
         self.events_dao.flush(f"gcal_events_data#{user_id}", data)
         self.synchronize_metrics(data)
-        pass
     def run(self):
         try:
             if not self.mu.acquire(blocking=False):
@@ -66,12 +67,14 @@ class GCalPollingJob(job.Job):
             self.mu.release()
     def synchronize_metrics(self, data: GCalEventsPerUserData):
         metrics_dps = collections.defaultdict(lambda: [])
+        events_synchronized = 0
         for eid, event in data.events.items():
-            if not event.startswith("#!"):
+            if not event.summary.startswith("#!"):
                 continue
+            events_synchronized += 1
             dims = { "src": eid, "activity": event.summary[2:] }
             start = datetime.datetime.fromisoformat(event.start)
-            end = datetime.datetime.fromisoformat(event.ned)
+            end = datetime.datetime.fromisoformat(event.end)
             duration_millis = (end - start) / datetime.timedelta(milliseconds=1)
             timestamp_millis = int(1000 * start.timestamp())
             custom_values = {}
@@ -94,6 +97,7 @@ class GCalPollingJob(job.Job):
                                               dimensions=dims,
                                               value=value)
                 metrics_dps["imp.events.custom." + name].append(new_dp)
+        logging.debug(f"Synchronized metrics from {events_synchronized} events")
         for metric_name, dps_list in metrics_dps.items():
             self.data_dao.delete_metric_name(metric_name)
             self.data_dao.add(metric_name, dps_list)
