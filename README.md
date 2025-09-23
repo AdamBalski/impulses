@@ -47,7 +47,7 @@ expenses = deltas.filter(lambda dp: dp.value < 0)
 income = deltas.filter(lambda dp: dp.value >= 0)
 
 # Compute 30-day sliding window sum
-expenses_30d = impulse_ops.sliding_window(expenses, 30, sum)
-income_30d = impulse_ops.sliding_window(income, 30, sum)
+expenses_30d = operations.sliding_window(expenses, 30, sum)
+income_30d = operations.sliding_window(income, 30, sum)
 ```
 ---
