@@ -1,0 +1,33 @@
+@startuml
+actor User
+participant "Impulses Server" as Server
+participant "Google OAuth2" as OAuth2
+participant "Google Calendar API" as GCal
+database "Persistent Datastore" as DB
+
+== OAuth2 Flow ==
+User -> Server : GET /oauth2/google/auth
+Server -> User : Redirect to OAuth2
+User -> OAuth2 : Authorize app
+OAuth2 -> User : Redirect back with code
+User -> Server : GET /oauth2/google/callback?code=...
+Server -> OAuth2 : Exchange code for tokens
+OAuth2 -> Server : Return tokens
+Server -> Server : Store user credentials
+== gCal polling job (runs every two minutes) ==
+Server -> GCal : Fetch events using stored credentials
+GCal -> Server : Return events (e.g. summary: "#!running", description: "distance=10000")
+Server -> DB : Store events as metrics
+
+== REST API usage ==
+User -> Server : GET /data/imp.events.duration
+Server -> DB : Read metrics
+DB --> Server : Return duration metric
+Server --> User : JSON metrics
+
+User -> Server : GET /data/imp.events.custom.distance
+Server -> DB : Read metrics
+DB --> Server : Return custom distance metric
+Server --> User : JSON metrics
+@enduml
+

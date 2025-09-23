@@ -12,8 +12,11 @@ Key points:
 - Converts events with special summaries (`#!`) into metrics.  
 
 ---
+## 2. Flow
+![Impulses OAuth2 + GCal + API Flow](https://img.plantuml.biz/plantuml/png/dPJRRjim38Rl_HISTzC2gxFjCe3Nmv86tSLQ9Eq3C1BdQ9KbGuTbtTEFKcmd7J8Wg6yiqpz_Vg9eN_c0BiHM5oY2TV3aoHKTXvHG7Pe0vLtRHUt9muhSBt8buB1yhLjOssY2--iODf-pQhSyglgAcen41zSFTrcxu4WXCU0QFK7vGCuh7uXJPXpqZ4PPDxifYhhkhU5MsotKTP6euU9BpmLJMCmVOM8nYIPDBZb93qKlO6bEcSAIf78a0WGxy0vcVOqffBjrwWy1TbtHXuzOh54ymrQ53GWhwIGeWLgdjCkKKLTLTK0urf__5Xiq3MLR-C6d5Emp6N-0CjPOKeZE38AzsIXOfLP2J6p2aUGEAzG-zRJX8u3EQgrC0p_j6ivSD1w8yruWR2sqoiH0_ZnrVE-SJevzRoc8JHARuDa-UUHJaw_APF4HtZxlZAgc0X_R5jtB5ChtxnZ1i5Vv0IHvuLGNb3NyHl9qe15KV_h8Ltb-03Ix6RVPs_BSj1IS4ZuFptA-Uao3nvZ8NVtl_AHndAYsgtOsbOmEK_b_Qoq9vLY08nT7DZZazhhHOZz6trRtt_UOfn69o3rkgw4PRm7RMS1WSIBV5N-zwQVn5m00iagram)
+---
 
-## 2. OAuth2 Setup
+## 3. OAuth2 Setup
 To allow the server to fetch calendar events, each user must authorize the Impulses app with Google OAuth2.
 
 Steps for the deployer:  
@@ -27,7 +30,7 @@ Steps for the user
 1. User visits the `/oauth2/google/auth` endpoint to authorize the app.  
 ---
 
-## 3. Polling Mechanics
+## 4. Polling Mechanics
 
 - The job runs every 120 seconds.
 - For each user, it:
@@ -39,7 +42,7 @@ Steps for the user
 
 ---
 
-## 4. Event-to-Metric Conversion
+## 5. Event-to-Metric Conversion
 
 - Only events whose titles start with `#!` are converted into metrics.
 - Event start and end times are used to calculate metric values (duration in milliseconds).  
