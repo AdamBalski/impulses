@@ -53,9 +53,12 @@ Steps for the user
 Example:
 
 ```text
-#!Running
+Summary: "#!Running"
+Description:
+"""
 where:park
 distance=10000
+"""
 ```
 
 - Summary (`#!Running`) → `activity` dimension.  
