@@ -158,6 +158,12 @@ def savings_rate(vals):
 savings_rate_30d = operations.sliding_window(deltas, 30, savings_rate)
 ```
 
-This computes a rolling 30-day savings rate from raw transaction deltas.  
+This gets you several impulses:
+* transactions (`deltas`)
+* expenses
+* income
+* sum of expenses over 30 days
+* sum of income over 30 days
+* a rolling 30-day savings rate from raw transaction deltas
 
 ---
