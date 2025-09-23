@@ -20,7 +20,7 @@ The Impulses Server is a Python-based backend that provides:
 
 ## 2. Prerequisites
 
-- **Python:** 3.10+ recommended
+- **Python:** 3.13.1+ recommended
 - **OS:** Linux or macOS
 - **Python dependencies:** `bcrypt`, `uvicorn`, `fastapi`, `apscheduler`, `httpx`, Google client libraries (`google-api-python-client`, `google-auth-httplib2`, `google-auth-oauthlib`).
 
@@ -31,7 +31,7 @@ The Impulses Server is a Python-based backend that provides:
 | `PORT` | ✔ | ✔ | ✔ | Port the application listens on |
 | `TOKEN` | ✔ | ✔ | ✔ | Server authentication token |
 | `HASHED_TOKEN` | ✔ | ✘ | ✘ | Bcrypt hash of `TOKEN` |
-| `GOOGLE_OAUTH2_CREDS` | ✔ | ✔ | ✔ | Google OAuth2 client credentials JSON (look at the gcal specific doc) |
+| `GOOGLE_OAUTH2_CREDS` | ✔ | ✔ | ✔ | Google OAuth2 client credentials JSON [(look at the gcal job specific doc)](./G_CAL_POLLING_JOB.md) |
 | `ORIGIN` | ✔ | ✔ | ✔ | Protocol + domain + port (for OAuth2 redirects) |
 | `REMOTE_HOST` | ✘ | ✔ | ✔ | Hostname for SSH deployment |
 | `REMOTE_PORT` | ✘ | ✔ | ✔ | SSH port for remote host |
@@ -129,7 +129,7 @@ chmod +x ./server/ops/deploy.sh
 - Reads last sync tokens to fetch only new events.
 - Updates local persistent datastore at `./data-store/persistent_obj_dir`.
 
-Refer to the separate [Google Calendar Polling Job README](./gcal_polling_job.md) for detailed instructions on OAuth2 setup, user authorization, and metric conversion.
+Refer to the separate [Google Calendar Polling Job README](./G_CAL_POLLING_JOB.md) for detailed instructions on OAuth2 setup, user authorization, and metric conversion.
 
 ---
 
