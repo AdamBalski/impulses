@@ -3,35 +3,14 @@ set -euo pipefail
 
 REPO_URL="https://github.com/AdamBalski/impulses"
 
-# Require TOKEN and REMOTE_HOST in env
-if [ -z "${TOKEN:-}" ]; then
-    echo "ERROR: TOKEN environment variable not set."
-    exit 1
-fi
-if [ -z "${REMOTE_HOST:-}" ]; then
-    echo "ERROR: REMOTE_HOST environment variable not set."
-    exit 1
-fi
-if [ -z "${REMOTE_PORT:-}" ]; then
-    echo "ERROR: REMOTE_PORT environment variable not set."
-    exit 1
-fi
-if [ -z "${REMOTE_USERNAME:-}" ]; then
-    echo "ERROR: REMOTE_USERNAME environment variable not set."
-    exit 1
-fi
-if [ -z "${PORT:-}" ]; then
-    echo "ERROR: PORT environment variable not set."
-    exit 1
-fi
-if [ -z "${CREDS:-}" ]; then
-    echo "ERROR: CREDS environment variable not set (google oauth2 related)."
-    exit 1
-fi
-if [ -z "${ORIGIN:-}" ]; then
-    echo "ERROR: ORIGIN environment variable not set."
-    exit 1
-fi
+required_vars=(TOKEN REMOTE_HOST REMOTE_PORT REMOTE_USERNAME PORT GOOGLE_OAUTH2_CREDS ORIGIN)
+
+for var in "${required_vars[@]}"; do
+    if [ -z "${!var:-}" ]; then
+        echo "ERROR: $var environment variable not set."
+        exit 1
+    fi
+done
 
 ssh "${REMOTE_USERNAME}@${REMOTE_HOST}" -p "$REMOTE_PORT" bash <<EOF
     set -euo pipefail
@@ -53,7 +32,7 @@ ssh "${REMOTE_USERNAME}@${REMOTE_HOST}" -p "$REMOTE_PORT" bash <<EOF
     HASHED_TOKEN="\`cat ~/.hashed_impulses_token\`" \
         TOKEN='$TOKEN' \
         PORT='$PORT' \
-        GOOGLE_OAUTH2_CREDS='$CREDS' \
+        GOOGLE_OAUTH2_CREDS='$GOOGLE_OAUTH2_CREDS' \
         ORIGIN='$ORIGIN' \
         nohup python3 -m src.run IMPULSES_APP > stdout 2>&1 &
     disown
