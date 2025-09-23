@@ -52,11 +52,11 @@ Steps for the user
 
 Example:
 
-§§§text
+```text
 #!Running
 where:park
 distance=10000
-§§§
+```
 
 - Summary (`#!Running`) → `activity` dimension.  
 - `where` → custom dimension.  
