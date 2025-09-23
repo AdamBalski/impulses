@@ -47,10 +47,10 @@ class GCalPollingJob(job.Job):
         data = self.events_dao.read(f"gcal_events_data#{user_id}")
 
         # poll for new events
-        changes = self.poll_events(creds, data.lastSyncToken)
+        changes_and_next_token = self.poll_events(creds, data.lastSyncToken)
 
         # upsert the new events via a side-effect
-        self.apply_changes(data, changes)
+        self.apply_changes(data, changes_and_next_token)
 
         self.events_dao.flush(f"gcal_events_data#{user_id}", data)
         self.synchronize_metrics(data)
@@ -103,7 +103,7 @@ class GCalPollingJob(job.Job):
             self.data_dao.add(metric_name, dps_list)
 
     def poll_events(self, creds: credentials.Credentials, last_sync_token: typing.Optional[str]) \
-            -> typing.Optional[list[dict]]:
+            -> typing.Optional[typing.Tuple[list[dict], str]]:
         """
         Polls for events and returns them as list in google api form if the poll was successful. 
         Includes tombstone events.
@@ -126,15 +126,17 @@ class GCalPollingJob(job.Job):
                 # should send the last sync token only on the first request
                 last_sync_token = None
             logging.debug(f"Fetched {len(result)} events")
-            return result
+            return result, nextSyncToken
         except Exception as e:
             logging.warning("Exception ocurred during actual events fetching", e)
-    def apply_changes(self, data: GCalEventsPerUserData, changes: typing.Optional[list[dict]]):
+    def apply_changes(self, data: GCalEventsPerUserData, changes_and_next_token: typing.Optional[typing.Tuple[list[dict], str]]):
         # an error during poll ocurred, possibly the lastSyncToken expired, 
         # should do full-sync on the next job run
-        if changes == None:
+        if changes_and_next_token == None:
             data.lastSyncToken = None
             return
+        changes, nextToken = changes_and_next_token
+        data.lastSyncToken = nextToken
         for event in changes:
             print(event)
             status = event["status"]
