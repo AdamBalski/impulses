@@ -1,7 +1,19 @@
 import pydantic
+import logging
 import typing
 from src.db import Dao
 
+class PerTimestampDimensionsKey:
+    def __init__(self, dimensions, timestamp):
+        self.timestamp = timestamp
+        self.dimensions = dimensions
+        entries = frozenset(dimensions.items())
+        self.hash = hash((self.timestamp, entries))
+    def __hash__(self):
+        return self.hash
+    def __eq__(self, other):
+        return self.dimensions == other.dimensions \
+            and self.timestamp == other.timestamp
 class DatapointDto(pydantic.BaseModel):
     timestamp: int
     dimensions: typing.Mapping[str, str]
@@ -19,6 +31,8 @@ class DataDao:
         self.metric_dao = Dao.TypedPersistentDao(dao, MetricType)
         self.metric_names_dao = Dao.TypedPersistentDao(dao, StringsListType)
     def add(self, metric_name: str, dps: typing.List[DatapointDto]):
+        self.log_duplicates(dps)
+
         metric_names = []
         with self.metric_names_dao.locked_access(f"metric_names") as (__metric_names, set_metric_names):
             metric_names = __metric_names.root
@@ -28,21 +42,10 @@ class DataDao:
 
         with self.metric_dao.locked_access(f"data#{metric_name}") as (datapoints, set_datapoints):
             dp_list = datapoints.root
-            class Key:
-                def __init__(self, dimensions, timestamp):
-                    self.timestamp = timestamp
-                    self.dimensions = dimensions
-                    entries = frozenset(dimensions.items())
-                    self.hash = hash((self.timestamp, entries))
-                def __hash__(self):
-                    return self.hash
-                def __eq__(self, other):
-                    return self.dimensions == other.dimensions \
-                        and self.timestamp == other.timestamp
 
-            datapoints_map = {Key(dp.dimensions, dp.timestamp): dp.value for dp in dp_list}
+            datapoints_map = {PerTimestampDimensionsKey(dp.dimensions, dp.timestamp): dp.value for dp in dp_list}
             for dp in dps:
-                datapoints_map[Key(dp.dimensions, dp.timestamp)] = dp.value
+                datapoints_map[PerTimestampDimensionsKey(dp.dimensions, dp.timestamp)] = dp.value
             dp_list = [DatapointDto(timestamp=k.timestamp, dimensions=k.dimensions, value=v)
                     for k, v in datapoints_map.items()]
             dp_list.sort(key=lambda dp: dp.timestamp)
@@ -57,4 +60,11 @@ class DataDao:
             metric_names = __metric_names.root
             set_metric_names(StringsListDto([name for name in metric_names if name != metric_name]))
         return self.metric_dao.delete(f"data#{metric_name}")
+    def log_duplicates(self, dps: list[DatapointDto]):
+        dps_map = {}
+        for dp in dps:
+            key = PerTimestampDimensionsKey(dp.dimensions, dp.timestamp)
+            if key in dps_map:
+                logging.warning(f"Duplicate data points inserted: {dps_map[key]}, {dp}")
+            dps_map[key] = dp.value
 

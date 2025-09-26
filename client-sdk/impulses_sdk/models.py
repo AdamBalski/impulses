@@ -22,7 +22,7 @@ class Datapoint:
     def from_api_obj(dto):
         return Datapoint(dto["timestamp"], dto["value"], dto["dimensions"])
     def __str__(self):
-        return "Datapoint{" + f"val@{self.timestamp} = {self.value}" + "}"
+        return "Datapoint{" + f"val@<{self.dimensions}>{self.timestamp} = {self.value}" + "}"
     def __repr__(self):
         return str(self)
 
