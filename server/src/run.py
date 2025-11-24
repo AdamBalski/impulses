@@ -10,6 +10,7 @@ import sys
 import uvicorn
 from apscheduler.schedulers.background import BackgroundScheduler
 from contextlib import asynccontextmanager
+from fastapi.middleware.cors import CORSMiddleware
 
 from src.common import health
 from src.common import state
@@ -98,6 +99,15 @@ def main():
         yield
         shutdown_handler(status)
     app = fastapi.FastAPI(lifespan=lifespan, dependencies = [fastapi.Depends(state.get_state)])
+    
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    
     app.include_router(google_oauth2.router, prefix="/oauth2/google")
     app.include_router(data.router, prefix="/data")
     app.include_router(user.router, prefix="/user")
