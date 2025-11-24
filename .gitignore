@@ -3,4 +3,7 @@ log*
 **/venv/**/*
 data-store
 **/impulses_sdk.egg-info/
-
+.idea
+/.env
+docker-compose.override.yml
+swagger.md

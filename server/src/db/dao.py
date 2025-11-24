@@ -1,11 +1,12 @@
-import contextlib
-import threading
+import abc
 import collections
+import contextlib
 import logging
 import os
 import pathlib
-import abc
+import threading
 import typing
+
 import pydantic
 
 T = typing.TypeVar("T", bound=pydantic.BaseModel)
@@ -73,40 +74,47 @@ class PersistentDao:
         self.tmp_name_counter = AtomicCounter()
         self.locks = PerStringLock()
 
-    def flush(self, obj_name, value, type_obj: Type):
-        logging.debug(f"Writing {type_obj} {obj_name} to data store")
-        self.cache[obj_name] = value
+    def _key_for_path(self, path: typing.Sequence[str]) -> str:
+        return "/".join(path)
+
+    def flush(self, path: typing.Sequence[str], value, type_obj: Type):
+        key = self._key_for_path(path)
+        logging.debug(f"Writing {type_obj} {key} to data store")
+        self.cache[key] = value
         tmp_path = self.get_tmp_path()
-        obj_path = self.get_path(obj_name)
+        obj_path = self.get_path(path)
+        os.makedirs(obj_path.parent, exist_ok=True)
         type_obj.serialize(value, tmp_path)
         os.replace(tmp_path, obj_path)
 
     @contextlib.contextmanager
-    def locked_access(self, obj_name: str, type_obj: Type):
+    def locked_access(self, path: typing.Sequence[str], type_obj: Type):
+        key = self._key_for_path(path)
         try:
-            self.locks.acquire(obj_name)
-            yield self.read(obj_name, type_obj), lambda new: self.flush(obj_name, new, type_obj)
+            self.locks.acquire(key)
+            yield self.read(path, type_obj), lambda new: self.flush(path, new, type_obj)
         finally:
-            self.locks.release(obj_name)
+            self.locks.release(key)
 
-
-    def read(self, obj_name: str, type_obj: Type):
-        cached = self.cache[obj_name] if obj_name in self.cache else None
+    def read(self, path: typing.Sequence[str], type_obj: Type):
+        key = self._key_for_path(path)
+        cached = self.cache[key] if key in self.cache else None
         if cached != None:
             return cached
-        self.cache[obj_name] = result = type_obj.deserialize(self.get_path(obj_name))
+        self.cache[key] = result = type_obj.deserialize(self.get_path(path))
         return result
 
-    def delete(self, obj_name):
-        logging.debug(f"Deleting {obj_name} from the data store")
-        self.cache[obj_name] = None
+    def delete(self, path: typing.Sequence[str]):
+        key = self._key_for_path(path)
+        logging.debug(f"Deleting {key} from the data store")
+        self.cache[key] = None
         try:
-            os.remove(self.get_path(obj_name))
+            os.remove(self.get_path(path))
         except FileNotFoundError:
             pass
 
-    def get_path(self, obj_name: str) -> pathlib.Path:
-        return self.storage_dir / "persistent_obj_dir" / obj_name
+    def get_path(self, path: typing.Sequence[str]) -> pathlib.Path:
+        return self.storage_dir / "persistent_obj_dir" / pathlib.Path(*path)
     def get_tmp_path(self) -> pathlib.Path:
         return self.storage_dir / "tmp" / str(self.tmp_name_counter.next())
 
@@ -114,11 +122,11 @@ class TypedPersistentDao(typing.Generic[T]):
     def __init__(self, dao: PersistentDao, type_obj: Type[T]):
         self.dao = dao
         self.type_obj = type_obj
-    def flush(self, obj_name: str, value: T):
-        return self.dao.flush(obj_name, value, self.type_obj)
-    def read(self, obj_name: str) -> T:
-        return self.dao.read(obj_name, self.type_obj)
-    def delete(self, obj_name: str) -> None:
-        return self.dao.delete(obj_name)
-    def locked_access(self, obj_name) -> typing.ContextManager[typing.Tuple[T, typing.Callable[[T], None]]]:
-        return self.dao.locked_access(obj_name, self.type_obj)
+    def flush(self, path: typing.Sequence[str], value: T):
+        return self.dao.flush(path, value, self.type_obj)
+    def read(self, path: typing.Sequence[str]) -> T:
+        return self.dao.read(path, self.type_obj)
+    def delete(self, path: typing.Sequence[str]) -> None:
+        return self.dao.delete(path)
+    def locked_access(self, path: typing.Sequence[str]) -> typing.ContextManager[typing.Tuple[T, typing.Callable[[T], None]]]:
+        return self.dao.locked_access(path, self.type_obj)

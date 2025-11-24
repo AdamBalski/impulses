@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPO_URL="https://github.com/AdamBalski/impulses"
 
-required_vars=(TOKEN REMOTE_HOST REMOTE_PORT REMOTE_USERNAME PORT GOOGLE_OAUTH2_CREDS ORIGIN)
+required_vars=(REMOTE_HOST REMOTE_PORT REMOTE_USERNAME PORT GOOGLE_OAUTH2_CREDS ORIGIN POSTGRES_CONN_JSON)
 
 for var in "${required_vars[@]}"; do
     if [ -z "${!var:-}" ]; then
@@ -23,17 +23,21 @@ ssh "${REMOTE_USERNAME}@${REMOTE_HOST}" -p "$REMOTE_PORT" bash <<EOF
     [ -d "venv" ] || python3 -m venv venv
     git fetch --all && git reset --hard origin/main
     source ./venv/bin/activate
-    pip3 install --upgrade bcrypt uvicorn fastapi apscheduler httpx
-    pip3 install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+    pip3 install --upgrade pip
+    pip3 install -r requirements.txt
+
+    echo "==> Running database migrations..."
+    POSTGRES_CONN_JSON='$POSTGRES_CONN_JSON' \
+        bash ./ops/db_migrate.sh
 
     echo "==> Starting app..."
     # the last python3 parameter is not used by the app, 
     # but simplifies the above pkill command
-    HASHED_TOKEN="\`cat ~/.hashed_impulses_token\`" \
-        TOKEN='$TOKEN' \
-        PORT='$PORT' \
+      PORT='$PORT' \
         GOOGLE_OAUTH2_CREDS='$GOOGLE_OAUTH2_CREDS' \
         ORIGIN='$ORIGIN' \
+        POSTGRES_CONN_JSON='$POSTGRES_CONN_JSON' \
+        SESSION_TTL_SEC='${SESSION_TTL_SEC:-1800}' \
         nohup python3 -m src.run IMPULSES_APP > stdout 2>&1 &
     disown
 

@@ -4,6 +4,8 @@ import typing
 from . import models
 
 def compose_impulses(evaled_impulses: typing.List[models.EvaluatedImpulse], operation):
+    """Composes impulses, e.g. adding or multiplying them.
+    """
     indices = [0 for _ in evaled_impulses]
     last_vals = [evaled_impulse.get_init_val() for evaled_impulse in evaled_impulses]
     new_init = operation([series.get_init_val() for series in evaled_impulses])
@@ -45,59 +47,3 @@ def compose_impulses(evaled_impulses: typing.List[models.EvaluatedImpulse], oper
     flush(new_time)
 
     return models.DatapointSeries(series=result, init_val=new_init)
-
-def prefix_op(impulse: models.DatapointSeries, operation):
-    prev = impulse.init_val
-    res_arr = []
-    for dp in impulse:
-        prev = operation([prev, dp.value])
-        res_arr.append(models.Datapoint(dp.timestamp, prev))
-    return models.DatapointSeries(res_arr, operation([impulse.init_val]))
-
-def sliding_window(impulse: models.EvaluatedImpulse, 
-                   window: int, 
-                   operation: typing.Callable[[list[float]], float], 
-                   fluid_phase_out = True):
-    """
-    Does a sliding window operation on the impulse
-    :param window: length of one window
-    :param operation: operation to apply for data in every window
-    :return: returns the impulse after the operation
-    """
-    if impulse.is_constant() or len(impulse.as_dp_series()) == 0:
-        return models.ConstantImpulse(operation([impulse.get_init_val()]))
-    impulse = impulse.as_dp_series()
-    result_dps = []
-
-    val_cnt = 0
-    values = collections.defaultdict(int)
-    events = [(dp.timestamp, "add", dp.value) for dp in impulse]
-    heapq.heapify(events)
-    while events:
-        time, kind, val = heapq.heappop(events)
-        if not fluid_phase_out and time > impulse.series[-1].timestamp:
-            break
-        if kind == "add":
-            val_cnt += 1
-            values[val] += 1
-            heapq.heappush(events, (time + window, "remove", val))
-        else:
-            val_cnt -= 1
-            values[val] -= 1
-        # don't push two dps with the same time
-        if events and events[0][0] == time:
-            continue
-        # no values => init val
-        if val_cnt == 0:
-            result_dps.append(models.Datapoint(time, impulse.get_init_val()))
-            continue
-        flat = []
-        for v, c in values.items():
-            flat.extend([v] * c)
-        result_dps.append(models.Datapoint(time, operation(flat)))
-
-    if fluid_phase_out:
-        # pop the init_val that's been added after removing the last dp
-        result_dps.pop()
-    return models.DatapointSeries(result_dps, impulse.get_init_val())
-

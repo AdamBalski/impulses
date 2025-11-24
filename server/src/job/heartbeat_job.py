@@ -1,5 +1,7 @@
 import logging
+
 from src.job import job
+
 
 class HeartbeatJob(job.Job):
     def run(self):

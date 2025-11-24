@@ -1,8 +1,9 @@
 import fastapi
 import string
 import typing
-from src.dao import DataDao
-from src import state
+from src.dao import data_dao
+from src.common import state
+from src.auth import token_auth
 
 VALID_SYMBOL_CHARACTERS = string.ascii_letters + string.digits + "!$%&()*+,-.:;<=>?@_()[]{}"
 def raise_invalid_symbol_exception(symbol_type: str, symbol: str):
@@ -16,7 +17,7 @@ def is_symbol_valid(symbol: str) -> bool:
 def assert_metric_name_validity(metric_name):
     if not is_symbol_valid(metric_name):
         raise_invalid_symbol_exception("Metric name", metric_name)
-def assert_dp_validity(dp: DataDao.DatapointDto):
+def assert_dp_validity(dp: data_dao.DatapointDto):
     for dim_key in dp.dimensions:
         if not is_symbol_valid(dim_key):
             raise_invalid_symbol_exception("Dimension key", dim_key)
@@ -24,32 +25,36 @@ def assert_metric_name_is_writable(metric_name: str):
     if metric_name.startswith("imp."):
         raise fastapi.HTTPException(status_code=403, 
                                     detail=f"Can't write to a metric name that starts with 'imp.'")
-def assert_dps_validity(dps: typing.List[DataDao.DatapointDto]):
+def assert_dps_validity(dps: typing.List[data_dao.DatapointDto]):
     for dp in dps:
         assert_dp_validity(dp)
 
 router = fastapi.APIRouter()
 
 @router.get("")
-def list_metric_names(dao = state.injected(DataDao.DataDao)):
-    return dao.list_metric_names()
+def list_metric_names(dao = state.injected(data_dao.DataDao),
+                      user_id: str = fastapi.Depends(token_auth.require_api_token)):
+    return dao.list_metric_names(user_id)
 
 @router.get("/{metric_name}")
-def get_metric_by_metric_name(metric_name: str, dao = state.injected(DataDao.DataDao)):
+def get_metric_by_metric_name(metric_name: str, dao = state.injected(data_dao.DataDao),
+                              user_id: str = fastapi.Depends(token_auth.require_api_token)):
     assert_metric_name_validity(metric_name)
-    return dao.get_metric_by_metric_name(metric_name)
+    return dao.get_metric_by_metric_name(user_id, metric_name)
     
 @router.post("/{metric_name}")
-def post_datapoints_for_metric_name(metric_name: str, payload: typing.List[DataDao.DatapointDto],
-                                    dao = state.injected(DataDao.DataDao)):
+def post_datapoints_for_metric_name(metric_name: str, payload: typing.List[data_dao.DatapointDto],
+                                    dao = state.injected(data_dao.DataDao),
+                                    user_id: str = fastapi.Depends(token_auth.require_ingest_token)):
     assert_metric_name_validity(metric_name)
     assert_metric_name_is_writable(metric_name)
     assert_dps_validity(payload)
-    dao.add(metric_name, payload)
+    dao.add(user_id, metric_name, payload)
 
 @router.delete("/{metric_name}")
-def delete_metric_name(metric_name: str, dao = state.injected(DataDao.DataDao)):
+def delete_metric_name(metric_name: str, dao = state.injected(data_dao.DataDao),
+                       user_id: str = fastapi.Depends(token_auth.require_ingest_token)):
     assert_metric_name_validity(metric_name)
     assert_metric_name_is_writable(metric_name)
-    dao.delete_metric_name(metric_name)
+    dao.delete_metric_name(user_id, metric_name)
 

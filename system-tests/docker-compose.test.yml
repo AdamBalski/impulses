@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-impulses}
+      POSTGRES_USER: ${POSTGRES_USER:-impulses_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-impulses_password}
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U ${POSTGRES_USER:-impulses_user} -d ${POSTGRES_DB:-impulses}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - impulses-test
+
+  app:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    environment:
+      PORT: "8000"
+      POSTGRES_CONN_JSON: '{"host": "postgres", "port": 5432, "dbname": "${POSTGRES_DB:-impulses}", "user": "${POSTGRES_USER:-impulses_user}", "password": "${POSTGRES_PASSWORD:-impulses_password}"}'
+      SESSION_TTL_SEC: "${SESSION_TTL_SEC:-1800}"
+      ORIGIN: http://app:8000
+      GOOGLE_OAUTH2_CREDS: ${GOOGLE_OAUTH2_CREDS:?GOOGLE_OAUTH2_CREDS must be set in .env file}
+    volumes:
+      - app_test_data:/app/data-store
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/healthz | grep -q 'UP'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks:
+      - impulses-test
+
+  tester:
+    image: python:3.11-slim
+    working_dir: /workspace
+    volumes:
+      - ../:/workspace:ro
+    environment:
+      BASE_URL: http://app:8000
+      TEST_ARGS: ${TEST_ARGS:-}
+    depends_on:
+      app:
+        condition: service_healthy
+    entrypoint: ["bash", "-lc"]
+    command: >
+      "pip install --no-cache-dir requests && \
+       python system-tests/run_all.py $TEST_ARGS"
+    networks:
+      - impulses-test
+
+volumes:
+  postgres_test_data:
+  app_test_data:
+
+networks:
+  impulses-test:
+    driver: bridge

@@ -11,16 +11,22 @@ import uvicorn
 from apscheduler.schedulers.background import BackgroundScheduler
 from contextlib import asynccontextmanager
 
-from src import health
-from src import state
-from src.auth import auth
-from src.dao import DataDao
-from src.db import Dao
+from src.common import health
+from src.common import state
+from src.dao import data_dao
+from src.db import dao
+from src.db import pg as dbpg
+from src.dao import user_repo, token_repo
 from src.resources import data
 from src.resources import google_oauth2
+from src.resources import user
+from src.resources import token
 from src.job import job
 from src.job import heartbeat_job
-from src.job import gcal_polling_job
+from src.job.gcal_sync import gcal_polling_job
+from src.auth.session import SessionStore
+from src.auth.token_cache import TokenCache
+from src.dao.gcal_dao import GCalDao
 
 def setup_logging():
     log_filename = "./log-" + str(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
@@ -41,14 +47,6 @@ def get_from_env_or_fail(var: str) -> str:
         return res
     raise Exception(f"Env variables {var} is required, but was not supplied, failing...")
 
-def get_token_from_env():
-    token = get_from_env_or_fail("TOKEN")
-    hashed_token = get_from_env_or_fail("HASHED_TOKEN")
-    if bcrypt.checkpw(token.encode("utf-8"), hashed_token.encode("utf-8")):
-        logging.info("App token hash verified")
-        return token
-    raise Exception("App token does not match its hash")
-
 def shutdown_handler(status: health.AppHealth):
     status.status = health.HealthStatus.STOPPING
     logging.info(f"Shutting down...")
@@ -60,19 +58,36 @@ def schedule_jobs(jobs: list[job.Job]):
 
 def main():
     global app_state
-    token = get_token_from_env()
     google_oauth2_creds = json.loads(get_from_env_or_fail("GOOGLE_OAUTH2_CREDS"))
     status = health.AppHealth(health.HealthStatus.UP)
-    db_dao = Dao.PersistentDao(pathlib.Path("./data-store"))
+    db_dao = dao.PersistentDao(pathlib.Path("./data-store"))
+    pg_conn_json = get_from_env_or_fail("POSTGRES_CONN_JSON")
+    pg_pool = dbpg.connect_from_json(pg_conn_json)
+    session_ttl_sec = int(os.environ.get("SESSION_TTL_SEC", "1800"))
+    session_store = SessionStore(ttl_seconds=session_ttl_sec)
+    
+    # Initialize token cache and load from database
+    token_cache = TokenCache()
+    token_repository = token_repo.TokenRepo(pg_pool)
+    token_cache.load_from_db(token_repository)
+    logging.info(f"Loaded {token_cache.size()} active tokens into cache")
+    
+    # Initialize GCalDao with file-based storage
+    gcal_dao = GCalDao(db_dao)
 
     app_state = state.set_state(state.AppState(
             status=status,
-            app_token=token,
             google_oauth2_state=state.GoogleOAuth2State(google_oauth2_creds),
             origin=get_from_env_or_fail("ORIGIN")
     )) \
-        .provide_obj(DataDao.DataDao(db_dao)) \
+        .provide_obj(data_dao.DataDao(db_dao)) \
         .provide_obj(db_dao) \
+        .provide_obj(pg_pool) \
+        .provide_obj(user_repo.UserRepo(pg_pool)) \
+        .provide_obj(token_repository) \
+        .provide_obj(session_store) \
+        .provide_obj(token_cache) \
+        .provide_obj(gcal_dao) \
         .register_job(heartbeat_job.HeartbeatJob) \
         .register_job(gcal_polling_job.GCalPollingJob)
 
@@ -84,8 +99,9 @@ def main():
         shutdown_handler(status)
     app = fastapi.FastAPI(lifespan=lifespan, dependencies = [fastapi.Depends(state.get_state)])
     app.include_router(google_oauth2.router, prefix="/oauth2/google")
-    app.include_router(data.router, prefix="/data", dependencies=[fastapi.Depends(auth.check_token),
-                                                                  fastapi.Depends(state.get_state)])
+    app.include_router(data.router, prefix="/data")
+    app.include_router(user.router, prefix="/user")
+    app.include_router(token.router, prefix="/token")
 
 
     @app.get("/healthz")

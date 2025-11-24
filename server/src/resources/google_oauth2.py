@@ -1,13 +1,20 @@
-import json
-import urllib
-import logging
-import httpx
-import fastapi
-import typing
 import base64
-from src import state
+import json
+import logging
+import secrets
+import time
+import urllib
+
+import fastapi
+import httpx
 from fastapi import responses
 from google.oauth2 import credentials
+
+from src.auth import token_auth
+from src.auth.token_cache import TokenCache
+from src.common import state
+from src.dao.gcal_dao import GCalDao
+from src.dao.token_repo import TokenRepo
 
 SCOPES = [
     # job for polling google calendar events
@@ -46,56 +53,139 @@ def construct_credentials(access_token, refresh_token, oauth2_state: state.Googl
 def check_for_scopes(scopes: list[str]):
     for scope in SCOPES:
         if scope not in scopes:
-            raise fastapi.HttpException(status_code=400, details=f"Not all scopes included. Needed scopes: {SCOPES}")
+            raise fastapi.HTTPException(status_code=400, detail=f"Not all scopes included. Needed scopes: {SCOPES}")
 
 
 router = fastapi.APIRouter()
 @router.get("/callback")
-async def oauth2_callback(request: fastapi.Request, code: str, 
-                          state: state.AppState = fastapi.Depends(state.get_state)):
-    oauth2_state = state.get_google_oauth2_state()
+async def oauth2_callback(
+    request: fastapi.Request,
+    code: str,
+    state_param: str = fastapi.Query(alias="state"),
+    app_state: state.AppState = fastapi.Depends(state.get_state)
+):
+    """Handle Google OAuth callback and store credentials linked to token."""
+    oauth2_state = app_state.get_google_oauth2_state()
+    tokens: TokenRepo = app_state.get_obj(TokenRepo)
+    gcal_dao: GCalDao = app_state.get_obj(GCalDao)
+    
+    # Retrieve pending auth
+    if not hasattr(oauth2_state, '_pending_auths'):
+        raise fastapi.HTTPException(status_code=400, detail="Invalid OAuth state")
+    
+    pending = oauth2_state._pending_auths.get(state_param)
+    if not pending:
+        raise fastapi.HTTPException(status_code=400, detail="Invalid or expired OAuth state")
+    
+    # Check if state expired
+    if pending["expires_at"] < int(time.time()):
+        del oauth2_state._pending_auths[state_param]
+        raise fastapi.HTTPException(status_code=400, detail="OAuth state expired")
+    
+    user_id = pending["user_id"]
+    token_id = pending["token_id"]
+    token_name = pending["token_name"]
+    
+    # Cleanup pending auth
+    del oauth2_state._pending_auths[state_param]
+    
+    # Verify token still valid
+    token = tokens.get_token_by_id(token_id)
+    if not token or token.expires_at < int(time.time()):
+        raise fastapi.HTTPException(status_code=401, detail="Token expired or deleted")
+    
+    # Exchange code for tokens
     async with httpx.AsyncClient() as client:
         resp = await client.post(
             oauth2_state.get_app_creds()["web"]["token_uri"],
             data=prepare_response_body_for_refresh_token_request(
-                oauth2_state.get_app_creds(), 
+                oauth2_state.get_app_creds(),
                 code,
-                state.get_origin())
+                app_state.get_origin())
         )
 
     try:
         resp.raise_for_status()
         token_data = resp.json()
         if (id_token := token_data["id_token"]) and (refresh_token := token_data.get("refresh_token")):
-            # id_token is a JWT, sub is an immutable google acc identifier
+            # Verify scopes
             scopes = token_data.get("scope").split(" ")
             check_for_scopes(scopes)
-            creds = construct_credentials(token_data.get("access_token"),
-                                          token_data.get("refresh_token"),
-                                          oauth2_state,
-                                          scopes=scopes)
-            user_id = get_sub(id_token)
-            # todo: insecure: stripping should be opt-in instead of opt-out
-            stripped_creds = creds.to_json(strip=["access_token", "refresh_token", "token", "client_secret"])
-            logging.debug(f"Setting gOAuth2 gCal creds for user: {user_id}. Creds: {stripped_creds}")
-            oauth2_state.get_tokens(user_id).set_creds(creds)
-            return {"status": "ok"}
+            
+            # Extract token expiry
+            access_token = token_data.get("access_token")
+            expires_in = token_data.get("expires_in", 3600)
+            token_expiry = int(time.time()) + expires_in
+            
+            # Store credentials in GCalDao linked to token
+            gcal_dao.store_credentials(
+                token_id=token_id,
+                user_id=user_id,
+                access_token=access_token,
+                refresh_token=refresh_token,
+                token_expiry=token_expiry
+            )
+            
+            logging.info(f"Stored GCal credentials for token {token_id} (user {user_id}, token name {token_name})")
+            
+            return {
+                "status": "authorized",
+                "token_name": token.name,
+                "user_id": user_id
+            }
     except Exception as e:
-        logging.error("Caught an error during oauth2 code for token exchange", e)
+        logging.error(f"Error during OAuth2 code exchange: {e}")
         raise
+    
     raise fastapi.HTTPException(status_code=500, detail="Internal Server Error")
 
 @router.get("/auth")
-async def redirect_to_google(request: fastapi.Request, state: state.AppState = fastapi.Depends(state.get_state)):
-    client_creds = state.get_google_oauth2_state().get_app_creds()
+async def redirect_to_google(
+    request: fastapi.Request,
+    app_state: state.AppState = fastapi.Depends(state.get_state),
+    user_id: str = fastapi.Depends(token_auth.require_api_token)
+):
+    """
+    Start Google OAuth flow.
+    Requires X-Data-Token header with API or SUPER capability.
+    """
+    token_header = request.headers.get("X-Data-Token")
+    if not token_header:
+        raise fastapi.HTTPException(status_code=400, detail="X-Data-Token header required")
+
+    # Lookup token by hash (aligned with token_auth cache keying)
+    token_hash = TokenCache.hash_token_for_storage(token_header)
+    tokens: TokenRepo = app_state.get_obj(TokenRepo)
+    token = tokens.get_token_by_hash(user_id, token_hash)
+    if not token:
+        raise fastapi.HTTPException(status_code=404, detail="Token not found")
+    
+    # Store pending authorization with token_id
+    oauth2_state = app_state.get_google_oauth2_state()
+    state_key = secrets.token_urlsafe(32)
+    
+    # Use oauth2_state to store pending auth temporarily
+    # Store in a dict attribute if not exists
+    if not hasattr(oauth2_state, '_pending_auths'):
+        oauth2_state._pending_auths = {}
+    oauth2_state._pending_auths[state_key] = {
+        "user_id": user_id,
+        "token_id": token.id,
+        "token_name": token.name,
+        "expires_at": int(time.time()) + 600  # 10 min expiry
+    }
+    
+    # Build authorization URL
+    client_creds = oauth2_state.get_app_creds()
     base_url = "https://accounts.google.com/o/oauth2/auth"
     params = {
         "response_type": "code",
         "client_id": client_creds["web"]["client_id"],
-        "redirect_uri": state.get_origin() + "/oauth2/google/callback",
+        "redirect_uri": app_state.get_origin() + "/oauth2/google/callback",
         "scope": " ".join(SCOPES),
         "access_type": "offline",
-        "prompt": "consent"
+        "prompt": "consent",
+        "state": state_key  # Pass our state
     }
 
     return responses.RedirectResponse(f"{base_url}?{urllib.parse.urlencode(params)}")

@@ -1,10 +1,11 @@
 import abc
-import uuid
-import typing
-import logging
 import datetime
+import logging
+import typing
+import uuid
 
-from src import state
+from src.common import state
+
 
 class Job:
     def __init__(self, state: "state.AppState"):

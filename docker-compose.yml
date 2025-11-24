@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: impulses-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-impulses}
+      POSTGRES_USER: ${POSTGRES_USER:-impulses_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-impulses_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-impulses_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - impulses-network
+
+  app:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: impulses-app
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      # Database connection (auto-constructed from env vars)
+      POSTGRES_CONN_JSON: '{"host": "postgres", "port": 5432, "database": "${POSTGRES_DB:-impulses}", "user": "${POSTGRES_USER:-impulses_user}", "password": "${POSTGRES_PASSWORD:-impulses_password}"}'
+      
+      # Session configuration
+      SESSION_TTL_SEC: "${SESSION_TTL_SEC:-1800}"
+
+      # Origin for OAuth callbacks
+      ORIGIN: ${ORIGIN:-http://localhost:8000}
+      
+      # Google OAuth2 credentials (must be set in .env)
+      GOOGLE_OAUTH2_CREDS: ${GOOGLE_OAUTH2_CREDS:?GOOGLE_OAUTH2_CREDS must be set in .env file}
+    volumes:
+      # Persistent data-store for file-based storage (metrics, GCal state)
+      - app_data:/app/data-store
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - impulses-network
+    restart: unless-stopped
+
+volumes:
+  # PostgreSQL data
+  postgres_data:
+    driver: local
+  # Application file storage (metrics, GCal events, token state)
+  app_data:
+    driver: local
+
+networks:
+  impulses-network:
+    driver: bridge
