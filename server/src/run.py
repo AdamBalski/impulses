@@ -102,10 +102,12 @@ def main():
     
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=["http://localhost:3000", get_from_env_or_fail("ORIGIN")],
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "X-Requested-With",
+                       "Accept", "Origin", "Referer", "User-Agent", "Cache-Control",
+                       "Pragma", "Expires", "X-Data-Token"],
     )
     
     app.include_router(google_oauth2.router, prefix="/oauth2/google")
