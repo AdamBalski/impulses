@@ -2,13 +2,13 @@ services:
   postgres:
     image: postgres:15-alpine
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-impulses}
-      POSTGRES_USER: ${POSTGRES_USER:-impulses_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-impulses_password}
+      POSTGRES_DB: impulses
+      POSTGRES_USER: impulses_user
+      POSTGRES_PASSWORD: impulses_password
     volumes:
       - postgres_test_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h localhost -U ${POSTGRES_USER:-impulses_user} -d ${POSTGRES_DB:-impulses}"]
+      test: ["CMD-SHELL", "pg_isready -h localhost -U impulses_user -d impulses"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -18,13 +18,13 @@ services:
   app:
     build:
       context: ../server
-      dockerfile: Dockerfile
+      dockerfile: ../sandbox/Dockerfile.app
     environment:
       PORT: "8000"
-      POSTGRES_CONN_JSON: '{"host": "postgres", "port": 5432, "dbname": "${POSTGRES_DB:-impulses}", "user": "${POSTGRES_USER:-impulses_user}", "password": "${POSTGRES_PASSWORD:-impulses_password}"}'
-      SESSION_TTL_SEC: "${SESSION_TTL_SEC:-1800}"
+      POSTGRES_CONN_JSON: '{"host": "postgres", "port": 5432, "dbname": "impulses", "user": "impulses_user", "password": "impulses_password"}'
+      SESSION_TTL_SEC: "1800"
       ORIGIN: http://app:8000
-      GOOGLE_OAUTH2_CREDS: ${GOOGLE_OAUTH2_CREDS:?GOOGLE_OAUTH2_CREDS must be set in .env file}
+      GOOGLE_OAUTH2_CREDS: '{}'
     volumes:
       - app_test_data:/app/data-store
     depends_on:

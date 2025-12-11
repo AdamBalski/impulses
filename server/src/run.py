@@ -34,7 +34,7 @@ def setup_logging():
     logging.basicConfig(
         filename=log_filename,
         level=logging.DEBUG,
-        format="%(asctime)s [%(levelname)s] %(message)s",
+        format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
     )
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 
@@ -102,7 +102,7 @@ def main():
     
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", get_from_env_or_fail("ORIGIN")],
+        allow_origins=[get_from_env_or_fail("ORIGIN")],
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization", "X-Requested-With",
@@ -121,7 +121,14 @@ def main():
         return status
 
     port = get_from_env_or_fail("PORT")
-    config = uvicorn.Config(app, host="0.0.0.0", port=int(port), log_level="info")
+    config = uvicorn.Config(
+        app, 
+        host="0.0.0.0", 
+        port=int(port), 
+        log_level="debug",
+        log_config=None,
+        access_log=True
+    )
     server = uvicorn.Server(config)
 
 

@@ -1,6 +1,7 @@
 import bcrypt
 import fastapi
 import pydantic
+import psycopg
 
 from src.auth import user_auth
 from src.auth.session import SessionStore
@@ -42,8 +43,11 @@ async def create_user(body: CreateUserBody,
     if role not in ("ADMIN", "STANDARD"):
         raise fastapi.HTTPException(status_code=422, detail="role must be ADMIN or STANDARD")
     password_hash = bcrypt.hashpw(body.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-    created = users.create_user(body.email, password_hash, role)
-    return _to_user_dto(created)
+    try:
+        created = users.create_user(body.email, password_hash, role)
+        return _to_user_dto(created)
+    except psycopg.errors.UniqueViolation:
+        raise fastapi.HTTPException(status_code=409, detail="User with this email already exists")
 
 @router.post("/login")
 async def login(body: LoginBody,

@@ -7,3 +7,5 @@ data-store
 /.env
 docker-compose.override.yml
 swagger.md
+.DS_STORE
+node_modules

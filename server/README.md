@@ -95,35 +95,11 @@ The server should start and be reachable at `http://localhost:<PORT>`.
 
 ## 4. Deployment
 
-### 4.1 Docker Deployment (Recommended)
+### 4.1 Sandbox
 
-**Quick start with Docker Compose:**
+Look at [sandbox](../sandbox) to see more.
 
-```bash
-cd ..  # Go to repository root
-cp .env.example .env
-# Edit .env and set GOOGLE_OAUTH2_CREDS
-make up
-```
-
-**What you get:**
-- PostgreSQL database (persistent volume)
-- Application server with migrations
-- File storage for metrics and GCal data (persistent volume)
-- Automatic health checks and restarts
-
-**Common commands:**
-```bash
-make help        # Show all available commands
-make logs        # View logs
-make db-shell    # Access PostgreSQL
-make backup-db   # Backup database
-make down        # Stop services
-```
-
-See [DOCKER.md](../DOCKER.md) for complete documentation.
-
-### 4.2 Local Development (Manual)
+### 4.2 Manual/Local
 - Run the server directly on your machine without Docker
 - Requires manual PostgreSQL setup and venv configuration
 - Follow steps in section 3 above

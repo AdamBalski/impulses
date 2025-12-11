@@ -51,10 +51,9 @@ def test_auth_edge_cases():
         f"{base_url}/user",
         json={"email": valid_email, "password": "AnotherPassword123!", "role": "STANDARD"}
     )
-    # Some implementations return 500 for database constraint violations instead of 409
     assert_true(
-        resp.status_code in [409, 500],
-        f"Duplicate email rejected with 409 or 500 (got {resp.status_code})"
+        resp.status_code == 409,
+        f"Duplicate email rejected with 409 (got {resp.status_code})"
     )
     
     # Test 4: Create user with invalid email format (missing @)

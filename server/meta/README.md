@@ -17,4 +17,4 @@ This registers all API routes but skips:
 - Session store initialization
 - OAuth2 credential loading
 
-Perfect for generating API documentation or testing route registration.
+In-mind with generating API documentation

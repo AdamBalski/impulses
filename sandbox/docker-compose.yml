@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: impulses-postgres
+    environment:
+      POSTGRES_DB: impulses
+      POSTGRES_USER: impulses_user
+      POSTGRES_PASSWORD: impulses_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U impulses_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - impulses-network
+
+  app:
+    build:
+      context: ../server
+      dockerfile: ../sandbox/Dockerfile.app
+    container_name: impulses-app
+    ports:
+      - "8000:8000"
+    environment:
+      POSTGRES_CONN_JSON: '{"host": "postgres", "port": 5432, "dbname": "impulses", "user": "impulses_user", "password": "impulses_password"}'
+      SESSION_TTL_SEC: 1800
+      PORT: 8000
+      ORIGIN: ${ORIGIN:-http://localhost:3000}
+      GOOGLE_OAUTH2_CREDS: "{}"
+    volumes:
+      - ../server:/app
+      - app_data:/app/data-store
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - impulses-network
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: ../ui
+      dockerfile: ../sandbox/Dockerfile.ui
+    container_name: impulses-ui
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_URL: http://localhost:8000
+    volumes:
+      - ../ui:/app
+      - /app/node_modules
+    depends_on:
+      - app
+    networks:
+      - impulses-network
+
+volumes:
+  postgres_data:
+    driver: local
+  app_data:
+    driver: local
+
+networks:
+  impulses-network:
+    driver: bridge
