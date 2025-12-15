@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Metrics from './pages/Metrics';
 import MetricDetail from './pages/MetricDetail';
 import Tokens from './pages/Tokens';
+import Charts from './pages/Charts';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -45,6 +46,7 @@ function Navigation() {
       <Link to="/dashboard">Dashboard</Link>
       <Link to="/metrics">Metrics</Link>
       <Link to="/tokens">Tokens</Link>
+      <Link to="/charts">Charts</Link>
       <button onClick={logout} style={{ float: 'right' }}>Logout</button>
     </nav>
   );
@@ -84,6 +86,11 @@ function AppContent() {
         <Route path="/tokens" element={
           <ProtectedRoute>
             <Tokens />
+          </ProtectedRoute>
+        } />
+        <Route path="/charts" element={
+          <ProtectedRoute>
+            <Charts />
           </ProtectedRoute>
         } />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />

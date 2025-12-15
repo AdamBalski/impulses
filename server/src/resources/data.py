@@ -5,7 +5,7 @@ from src.dao import data_dao
 from src.common import state
 from src.auth import token_auth
 
-VALID_SYMBOL_CHARACTERS = string.ascii_letters + string.digits + "!$%&()*+,-.:;<=>?@_()[]{}"
+VALID_SYMBOL_CHARACTERS = string.ascii_letters + string.digits + "!$%&*+,-.:;<=>?@_()[]{}"
 def raise_invalid_symbol_exception(symbol_type: str, symbol: str):
     raise fastapi.HTTPException(status_code=422, detail=f"{symbol_type} ({symbol}) is invalid. "\
             "E.g. incorrect length (should be more than 0 characters and less than 100 "\

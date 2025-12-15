@@ -1,0 +1,102 @@
+.chart-container {
+  border: 2px solid #222;
+  padding: 1.5em;
+  margin: 1.5em 0;
+  background: #fff;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1em;
+}
+
+.chart-header h3 {
+  margin: 0;
+}
+
+.chart-actions {
+  display: flex;
+  gap: 0.5em;
+}
+
+.chart-canvas {
+  border: 1px solid #ddd;
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1em;
+  margin-top: 1em;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border: 1px solid #222;
+}
+
+.chart-form {
+  margin: 1em 0;
+}
+
+.chart-form label {
+  display: block;
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.25em;
+}
+
+.impulses-section {
+  margin-top: 1.5em;
+  padding-top: 1em;
+  border-top: 1px solid #ddd;
+}
+
+.impulses-section h4 {
+  margin: 0 0 1em 0;
+}
+
+.impulse-row {
+  display: flex;
+  gap: 0.5em;
+  align-items: center;
+  margin-bottom: 0.5em;
+}
+
+.impulse-row input[type="text"] {
+  flex: 1;
+  margin: 0;
+}
+
+.impulse-row input[type="color"] {
+  width: 50px;
+  height: 38px;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.chart-wrapper {
+  margin-bottom: 2em;
+}
+
+.edit-chart-btn {
+  margin-top: 0.5em;
+}
+
+@media (max-width: 600px) {
+  .impulse-row {
+    flex-wrap: wrap;
+  }
+}
