@@ -22,4 +22,4 @@ RUN mkdir -p /app/data-store
 EXPOSE 8000
 
 # Run migrations and start server
-CMD ["sh", "-c", "bash ./ops/db_migrate.sh && python -m src.run"]
+CMD ["sh", "-c", "bash ../ops/db_migrate.sh && python -m src.run"]

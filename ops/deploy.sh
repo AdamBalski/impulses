@@ -3,6 +3,8 @@ set -euo pipefail
 
 REPO_URL="https://github.com/AdamBalski/impulses"
 
+REF="${REF:-main}"
+
 required_vars=(REMOTE_HOST REMOTE_PORT REMOTE_USERNAME PORT GOOGLE_OAUTH2_CREDS ORIGIN POSTGRES_CONN_JSON)
 
 for var in "${required_vars[@]}"; do
@@ -19,16 +21,18 @@ ssh "${REMOTE_USERNAME}@${REMOTE_HOST}" -p "$REMOTE_PORT" bash <<EOF
 
     echo "==> Cloning/updating repo..."
     [ -d "impulses" ] || git clone $REPO_URL impulses
-    cd impulses/server
+    cd impulses
+    git fetch --all --tags
+    git checkout --detach "$REF"
+    cd server
     [ -d "venv" ] || python3 -m venv venv
-    git fetch --all && git reset --hard origin/main
     source ./venv/bin/activate
     pip3 install --upgrade pip
     pip3 install -r requirements.txt
 
     echo "==> Running database migrations..."
     POSTGRES_CONN_JSON='$POSTGRES_CONN_JSON' \
-        bash ./ops/db_migrate.sh
+        bash ../ops/db_migrate.sh
 
     echo "==> Starting app..."
     # the last python3 parameter is not used by the app, 

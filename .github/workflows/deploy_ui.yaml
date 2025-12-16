@@ -1,36 +1,40 @@
-name: Restart application
+name: Deploy UI to Remote Server
 
 on:
   workflow_dispatch:
 
 jobs:
-  deploy:
+  deploy_ui:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
       - name: Set up SSH
         uses: webfactory/ssh-agent@v0.7.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          
+
       - name: Add SSH host key
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -p ${{ secrets.REMOTE_PORT }} ${{ secrets.REMOTE_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Run restart script
+      - name: Deploy UI
         env:
           REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
           REMOTE_USERNAME: ${{ secrets.REMOTE_USERNAME }}
           REMOTE_PORT: ${{ secrets.REMOTE_PORT }}
-          PORT: ${{ secrets.PORT }}
-          GOOGLE_OAUTH2_CREDS: ${{ secrets.GOOGLE_OAUTH2_CREDS}}
-          ORIGIN: ${{ secrets.ORIGIN }}
-          POSTGRES_CONN_JSON: ${{ secrets.POSTGRES_CONN_JSON }}
-          SESSION_TTL_SEC: ${{ secrets.SESSION_TTL_SEC }}
+          ORIGIN_UI: ${{ secrets.ORIGIN_UI }}
+          ORIGIN_API: ${{ secrets.ORIGIN_API }}
+          UI_PORT: ${{ secrets.UI_PORT }}
         run: |
-          chmod +x ./server/ops/restart.sh
-          ./server/ops/restart.sh
-
+          chmod +x ./ops/deploy_ui.sh
+          ./ops/deploy_ui.sh
