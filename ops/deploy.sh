@@ -23,7 +23,8 @@ ssh "${REMOTE_USERNAME}@${REMOTE_HOST}" -p "$REMOTE_PORT" bash <<EOF
     [ -d "impulses" ] || git clone $REPO_URL impulses
     cd impulses
     git fetch --all --tags
-    git checkout --detach "$REF"
+    git reset --hard "origin/$REF"
+    git clean -fd
     cd server
     [ -d "venv" ] || python3 -m venv venv
     source ./venv/bin/activate

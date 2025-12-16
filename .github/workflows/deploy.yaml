@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Git ref (branch, tag, or SHA) to deploy'
+        description: 'Git ref (branch, tag) to deploy'
         required: false
         default: 'main'
 
