@@ -37,7 +37,7 @@ export default function Metrics() {
       setError('');
       const datapoint = {
         value: parseFloat(newValue),
-        timestamp: Math.floor(Date.now() / 1000),
+        timestamp: Date.now(),
         dimensions: {}
       };
       await api.addDatapoints(newMetric, [datapoint]);

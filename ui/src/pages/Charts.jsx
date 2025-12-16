@@ -20,6 +20,81 @@ function saveChartsToStorage(charts) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(charts));
 }
 
+function ChartForm({
+  title,
+  submitLabel,
+  formName,
+  setFormName,
+  formDescription,
+  setFormDescription,
+  formImpulses,
+  handleImpulseChange,
+  handleRemoveImpulse,
+  handleAddImpulse,
+  handleSubmit,
+  onCancel,
+}) {
+  return (
+    <div className="card chart-form">
+      <h3>{title}</h3>
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label>Name</label>
+          <input
+            type="text"
+            value={formName}
+            onChange={e => setFormName(e.target.value)}
+            placeholder="Chart name"
+            required
+          />
+        </div>
+
+        <div>
+          <label>Description</label>
+          <textarea
+            value={formDescription}
+            onChange={e => setFormDescription(e.target.value)}
+            placeholder="Optional description"
+          />
+        </div>
+
+        <div className="impulses-section">
+          <h4>Impulses (Metrics)</h4>
+          {formImpulses.map((impulse, idx) => (
+            <div key={idx} className="impulse-row">
+              <input
+                type="text"
+                value={impulse.impulse_expression}
+                onChange={e => handleImpulseChange(idx, 'impulse_expression', e.target.value)}
+                placeholder="Metric name"
+              />
+              <select
+                value={impulse.displayType || 'line'}
+                onChange={e => handleImpulseChange(idx, 'displayType', e.target.value)}
+              >
+                <option value="line">Line</option>
+                <option value="dots">Dots</option>
+              </select>
+              <input
+                type="color"
+                value={impulse.color}
+                onChange={e => handleImpulseChange(idx, 'color', e.target.value)}
+              />
+              <button type="button" onClick={() => handleRemoveImpulse(idx)}>Remove</button>
+            </div>
+          ))}
+          <button type="button" onClick={handleAddImpulse}>Add Impulse</button>
+        </div>
+
+        <div className="button-group">
+          <button type="submit">{submitLabel}</button>
+          <button type="button" onClick={onCancel}>Cancel</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 export default function Charts() {
   const [charts, setCharts] = useState(loadChartsFromStorage);
   const [showForm, setShowForm] = useState(false);
@@ -114,66 +189,20 @@ export default function Charts() {
       </div>
 
       {showForm && !editingChart && (
-        <div className="card chart-form">
-          <h3>New Chart</h3>
-          <form onSubmit={handleSubmit}>
-            <div>
-              <label>Name</label>
-              <input
-                type="text"
-                value={formName}
-                onChange={e => setFormName(e.target.value)}
-                placeholder="Chart name"
-                required
-              />
-            </div>
-
-            <div>
-              <label>Description</label>
-              <textarea
-                value={formDescription}
-                onChange={e => setFormDescription(e.target.value)}
-                placeholder="Optional description"
-              />
-            </div>
-
-            <div className="impulses-section">
-              <h4>Impulses (Metrics)</h4>
-              {formImpulses.map((impulse, idx) => (
-                <div key={idx} className="impulse-row">
-                  <input
-                    type="text"
-                    value={impulse.impulse_expression}
-                    onChange={e => handleImpulseChange(idx, 'impulse_expression', e.target.value)}
-                    placeholder="Metric name"
-                    style={{ flex: 1 }}
-                  />
-                  <select
-                    value={impulse.displayType || 'line'}
-                    onChange={e => handleImpulseChange(idx, 'displayType', e.target.value)}
-                    style={{ width: '80px' }}
-                  >
-                    <option value="line">Line</option>
-                    <option value="dots">Dots</option>
-                  </select>
-                  <input
-                    type="color"
-                    value={impulse.color}
-                    onChange={e => handleImpulseChange(idx, 'color', e.target.value)}
-                    style={{ width: '50px', padding: '0.25em' }}
-                  />
-                  <button type="button" onClick={() => handleRemoveImpulse(idx)}>Remove</button>
-                </div>
-              ))}
-              <button type="button" onClick={handleAddImpulse}>Add Impulse</button>
-            </div>
-
-            <div className="button-group">
-              <button type="submit">Create</button>
-              <button type="button" onClick={resetForm}>Cancel</button>
-            </div>
-          </form>
-        </div>
+        <ChartForm
+          title="New Chart"
+          submitLabel="Create"
+          formName={formName}
+          setFormName={setFormName}
+          formDescription={formDescription}
+          setFormDescription={setFormDescription}
+          formImpulses={formImpulses}
+          handleImpulseChange={handleImpulseChange}
+          handleRemoveImpulse={handleRemoveImpulse}
+          handleAddImpulse={handleAddImpulse}
+          handleSubmit={handleSubmit}
+          onCancel={resetForm}
+        />
       )}
 
       {charts.length === 0 && !showForm && (
@@ -183,66 +212,20 @@ export default function Charts() {
       {charts.map(chart => (
         <div key={chart.id} className="chart-wrapper">
           {editingChart?.id === chart.id && (
-            <div className="card chart-form">
-              <h3>Edit Chart</h3>
-              <form onSubmit={handleSubmit}>
-                <div>
-                  <label>Name</label>
-                  <input
-                    type="text"
-                    value={formName}
-                    onChange={e => setFormName(e.target.value)}
-                    placeholder="Chart name"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label>Description</label>
-                  <textarea
-                    value={formDescription}
-                    onChange={e => setFormDescription(e.target.value)}
-                    placeholder="Optional description"
-                  />
-                </div>
-
-                <div className="impulses-section">
-                  <h4>Impulses (Metrics)</h4>
-                  {formImpulses.map((impulse, idx) => (
-                    <div key={idx} className="impulse-row">
-                      <input
-                        type="text"
-                        value={impulse.impulse_expression}
-                        onChange={e => handleImpulseChange(idx, 'impulse_expression', e.target.value)}
-                        placeholder="Metric name"
-                        style={{ flex: 1 }}
-                      />
-                      <select
-                        value={impulse.displayType || 'line'}
-                        onChange={e => handleImpulseChange(idx, 'displayType', e.target.value)}
-                        style={{ width: '80px' }}
-                      >
-                        <option value="line">Line</option>
-                        <option value="dots">Dots</option>
-                      </select>
-                      <input
-                        type="color"
-                        value={impulse.color}
-                        onChange={e => handleImpulseChange(idx, 'color', e.target.value)}
-                        style={{ width: '50px', padding: '0.25em' }}
-                      />
-                      <button type="button" onClick={() => handleRemoveImpulse(idx)}>Remove</button>
-                    </div>
-                  ))}
-                  <button type="button" onClick={handleAddImpulse}>Add Impulse</button>
-                </div>
-
-                <div className="button-group">
-                  <button type="submit">Update</button>
-                  <button type="button" onClick={resetForm}>Cancel</button>
-                </div>
-              </form>
-            </div>
+            <ChartForm
+              title="Edit Chart"
+              submitLabel="Update"
+              formName={formName}
+              setFormName={setFormName}
+              formDescription={formDescription}
+              setFormDescription={setFormDescription}
+              formImpulses={formImpulses}
+              handleImpulseChange={handleImpulseChange}
+              handleRemoveImpulse={handleRemoveImpulse}
+              handleAddImpulse={handleAddImpulse}
+              handleSubmit={handleSubmit}
+              onCancel={resetForm}
+            />
           )}
           <Chart
             chart={chart}

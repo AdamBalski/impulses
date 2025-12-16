@@ -1,3 +1,5 @@
+/* Chart / dashboard-specific styles */
+
 .chart-container {
   border: 2px solid #222;
   padding: 1.5em;
@@ -24,8 +26,21 @@
 .chart-canvas {
   border: 1px solid #ddd;
   display: block;
+  width: 700px;
+  height: 300px;
   max-width: 100%;
-  height: auto;
+}
+
+.chart-canvas--empty {
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chart-canvas__empty-text {
+  color: #666;
+  font-size: 14px;
 }
 
 .chart-legend {
@@ -80,11 +95,17 @@
   margin: 0;
 }
 
+.impulse-row select {
+  width: 80px;
+  margin: 0;
+}
+
 .impulse-row input[type="color"] {
   width: 50px;
   height: 38px;
   padding: 2px;
   cursor: pointer;
+  margin: 0;
 }
 
 .chart-wrapper {

@@ -22,8 +22,8 @@ services:
 
   app:
     build:
-      context: ../server
-      dockerfile: ../sandbox/Dockerfile.app
+      context: ..
+      dockerfile: ./sandbox/Dockerfile.app
     container_name: impulses-app
     ports:
       - "8000:8000"
@@ -34,7 +34,7 @@ services:
       ORIGIN: ${ORIGIN:-http://localhost:3000}
       GOOGLE_OAUTH2_CREDS: "{}"
     volumes:
-      - ../server:/app
+      - ..:/app
       - app_data:/app/data-store
     depends_on:
       postgres:
@@ -52,6 +52,8 @@ services:
       - "3000:3000"
     environment:
       VITE_API_URL: http://localhost:8000
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "200"
     volumes:
       - ../ui:/app
       - /app/node_modules

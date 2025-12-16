@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
+import Plot from './Plot';
 
 export default function Chart({ chart, onUpdate, onDelete }) {
   const [data, setData] = useState({});

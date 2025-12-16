@@ -9,17 +9,16 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY server/requirements.txt server/requirements.txt
+RUN pip install --no-cache-dir -r server/requirements.txt
 
 # Copy application code
 COPY . .
 
 # Create data storage directory
-RUN mkdir -p /app/data-store
-
+RUN mkdir -p /app/server/data-store
 # Expose port
 EXPOSE 8000
 
 # Run migrations and start server
-CMD ["sh", "-c", "bash ../ops/db_migrate.sh && python -m src.run"]
+CMD ["sh", "-c", "bash ./ops/db_migrate.sh && cd server && python -m src.run"]
