@@ -35,8 +35,8 @@ scp -P "$REMOTE_PORT" "$tmp_tar" "${REMOTE_USERNAME}@${REMOTE_HOST}:impulses-ui.
 ssh "${REMOTE_USERNAME}@${REMOTE_HOST}" -p "$REMOTE_PORT" bash <<EOF
     set -euo pipefail
 
-    mkdir -p impulses-ui
     rm -rf impulses-ui-tmp
+    mkdir -p impulses-ui impulses-ui-tmp
     tar -xzf impulses-ui.tgz -C impulses-ui-tmp
     mv impulses-ui-tmp impulses-ui
 EOF
