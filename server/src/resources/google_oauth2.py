@@ -57,6 +57,41 @@ def check_for_scopes(scopes: list[str]):
 
 
 router = fastapi.APIRouter()
+
+
+@router.get("/configs")
+async def list_oauth2_configs(
+    user_id: str = fastapi.Depends(token_auth.require_api_token),
+    app_state: state.AppState = fastapi.Depends(state.get_state),
+):
+    tokens: TokenRepo = app_state.get_obj(TokenRepo)
+    gcal_dao: GCalDao = app_state.get_obj(GCalDao)
+
+    res = []
+    for token in tokens.list_tokens(user_id):
+        creds = gcal_dao.get_credentials(token.id)
+        if not creds:
+            continue
+
+        sync_state = gcal_dao.get_sync_state(token.id)
+
+        res.append({
+            "provider": "google",
+            "product": "calendar",
+            "token_id": token.id,
+            "token_name": token.name,
+            "connected": True,
+            "updated_at": creds.updated_at,
+            "token_expiry": creds.token_expiry,
+            "sync": None if sync_state is None else {
+                "calendar_id": sync_state.calendar_id,
+                "last_sync_at": sync_state.last_sync_at,
+                "has_sync_token": sync_state.sync_token is not None,
+            },
+        })
+
+    return res
+
 @router.get("/callback")
 async def oauth2_callback(
     request: fastapi.Request,

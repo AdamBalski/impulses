@@ -32,6 +32,7 @@ services:
       SESSION_TTL_SEC: 1800
       PORT: 8000
       ORIGIN: ${ORIGIN:-http://localhost:3000}
+      ORIGIN_API: ${ORIGIN:-http://localhost:8000}
       GOOGLE_OAUTH2_CREDS: "{}"
     volumes:
       - ..:/app

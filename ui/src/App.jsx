@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Metrics from './pages/Metrics';
 import MetricDetail from './pages/MetricDetail';
 import Tokens from './pages/Tokens';
+import GCalIntegration from './pages/GCalIntegration';
 import Charts from './pages/Charts';
 
 function ProtectedRoute({ children }) {
@@ -46,6 +47,7 @@ function Navigation() {
       <Link to="/dashboard">Dashboard</Link>
       <Link to="/metrics">Metrics</Link>
       <Link to="/tokens">Tokens</Link>
+      <Link to="/gcal">GCal integration</Link>
       <Link to="/charts">Charts</Link>
       <button onClick={logout} style={{ float: 'right' }}>Logout</button>
     </nav>
@@ -86,6 +88,11 @@ function AppContent() {
         <Route path="/tokens" element={
           <ProtectedRoute>
             <Tokens />
+          </ProtectedRoute>
+        } />
+        <Route path="/gcal" element={
+          <ProtectedRoute>
+            <GCalIntegration />
           </ProtectedRoute>
         } />
         <Route path="/charts" element={

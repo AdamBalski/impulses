@@ -232,6 +232,19 @@ export const api = {
     }
 
     window.location.href = url;
+  },
+
+  async listGoogleOAuthConfigs() {
+    try {
+      const response = await fetch(`${API_BASE}/oauth2/google/configs`, {
+        headers: getDataHeaders(),
+        credentials: includeCredentials,
+      });
+      return handleResponse(response);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Network error: Unable to connect to server', 0, null);
+    }
   }
 };
 
