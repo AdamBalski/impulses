@@ -49,7 +49,7 @@ export default function Chart({ chart, onUpdate, onDelete }) {
 
       {error && <div className="error">{error}</div>}
 
-      <Plot data={data} impulses={chart.impulses} />
+      <Plot data={data} impulses={chart.impulses} formatYAsDurationMs={!!chart.formatYAsDurationMs} />
 
       <div className="chart-legend">
         {chart.impulses.map((impulse, idx) => (

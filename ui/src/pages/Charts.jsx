@@ -28,6 +28,8 @@ function ChartForm({
   formDescription,
   setFormDescription,
   formImpulses,
+  formFormatYAsDurationMs,
+  setFormFormatYAsDurationMs,
   handleImpulseChange,
   handleRemoveImpulse,
   handleAddImpulse,
@@ -57,6 +59,15 @@ function ChartForm({
             placeholder="Optional description"
           />
         </div>
+
+        <label style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-start', gap: '6px', whiteSpace: 'nowrap' }}>
+          <input
+            type="checkbox"
+            checked={formFormatYAsDurationMs}
+            onChange={e => setFormFormatYAsDurationMs(e.target.checked)}
+          />
+          Render Y values as durations (ms)
+        </label>
 
         <div className="impulses-section">
           <h4>Impulses (Metrics)</h4>
@@ -103,6 +114,7 @@ export default function Charts() {
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formImpulses, setFormImpulses] = useState([]);
+  const [formFormatYAsDurationMs, setFormFormatYAsDurationMs] = useState(false);
 
   const isInitialMount = useRef(true);
 
@@ -118,6 +130,7 @@ export default function Charts() {
     setFormName('');
     setFormDescription('');
     setFormImpulses([]);
+    setFormFormatYAsDurationMs(false);
     setEditingChart(null);
     setShowForm(false);
   }
@@ -131,6 +144,7 @@ export default function Charts() {
     setFormName(chart.name);
     setFormDescription(chart.description || '');
     setFormImpulses([...chart.impulses]);
+    setFormFormatYAsDurationMs(!!chart.formatYAsDurationMs);
     setEditingChart(chart);
     setShowForm(true);
   }
@@ -157,6 +171,7 @@ export default function Charts() {
       name: formName,
       description: formDescription,
       impulses: formImpulses.filter(i => i.impulse_expression.trim()),
+      formatYAsDurationMs: !!formFormatYAsDurationMs,
       createdAt: editingChart?.createdAt || Date.now(),
       updatedAt: Date.now(),
     };
@@ -197,6 +212,8 @@ export default function Charts() {
           formDescription={formDescription}
           setFormDescription={setFormDescription}
           formImpulses={formImpulses}
+          formFormatYAsDurationMs={formFormatYAsDurationMs}
+          setFormFormatYAsDurationMs={setFormFormatYAsDurationMs}
           handleImpulseChange={handleImpulseChange}
           handleRemoveImpulse={handleRemoveImpulse}
           handleAddImpulse={handleAddImpulse}
@@ -220,6 +237,8 @@ export default function Charts() {
               formDescription={formDescription}
               setFormDescription={setFormDescription}
               formImpulses={formImpulses}
+              formFormatYAsDurationMs={formFormatYAsDurationMs}
+              setFormFormatYAsDurationMs={setFormFormatYAsDurationMs}
               handleImpulseChange={handleImpulseChange}
               handleRemoveImpulse={handleRemoveImpulse}
               handleAddImpulse={handleAddImpulse}

@@ -1,7 +1,28 @@
 import { useMemo } from 'react';
 import ReactApexChart from 'react-apexcharts';
 
-export default function Plot({ data = {}, impulses = [], width = 700, height = 300 }) {
+function formatDurationMs(ms) {
+  if (ms == null || Number.isNaN(ms)) return '';
+  const sign = ms < 0 ? '-' : '';
+  const abs = Math.abs(ms);
+  const totalSeconds = Math.floor(abs / 1000);
+  const milliseconds = Math.floor(abs % 1000);
+  const seconds = totalSeconds % 60;
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const minutes = totalMinutes % 60;
+  const hours = Math.floor(totalMinutes / 60);
+
+  const parts = [];
+  if (hours) parts.push(`${hours}h`);
+  if (minutes) parts.push(`${minutes}m`);
+  if (seconds) parts.push(`${seconds}s`);
+  if (milliseconds) parts.push(`${milliseconds}ms`);
+
+  if (parts.length === 0) return '0ms';
+  return sign + parts.join(' ');
+}
+
+export default function Plot({ data = {}, impulses = [], width = 700, height = 300, formatYAsDurationMs = false }) {
   const { series, hasData } = useMemo(() => {
     let hasData = false;
 
@@ -48,6 +69,11 @@ export default function Plot({ data = {}, impulses = [], width = 700, height = 3
         x: {
           format: 'MMM dd, HH:mm:ss',
         },
+        y: formatYAsDurationMs
+          ? {
+              formatter: (val) => formatDurationMs(val),
+            }
+          : undefined,
       },
       xaxis: {
         type: 'datetime',
@@ -67,12 +93,15 @@ export default function Plot({ data = {}, impulses = [], width = 700, height = 3
         },
       },
       yaxis: {
-        labels: { style: { fontSize: '10px' } },
+        labels: {
+          style: { fontSize: '10px' },
+          formatter: formatYAsDurationMs ? (val) => formatDurationMs(val) : undefined,
+        },
       },
       legend: { show: false },
       colors: impulses.map(i => i.color || '#0066cc'),
     };
-  }, [impulses]);
+  }, [formatYAsDurationMs, impulses]);
 
   if (!hasData) {
     return (
