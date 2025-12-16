@@ -61,7 +61,7 @@ async def login(body: LoginBody,
     if not bcrypt.checkpw(body.password.encode("utf-8"), u.password_hash.encode("utf-8")):
         raise fastapi.HTTPException(status_code=401, detail="Invalid credentials")
     token, sess = sessions.create(u.id, u.email, u.role)
-    secure = _secure_cookie_flag(app_state.get_origin())
+    secure = _secure_cookie_flag(app_state.get_api_origin())
     response.set_cookie(
         key="sid",
         value=token,
@@ -79,7 +79,7 @@ async def logout(response: fastapi.Response,
                  sid_and_sess = fastapi.Depends(user_auth.get_session_and_token)) -> dict:
     sid, sess = sid_and_sess
     sessions.revoke(sid)
-    secure = _secure_cookie_flag(app_state.get_origin())
+    secure = _secure_cookie_flag(app_state.get_api_origin())
     # Clear cookie
     response.delete_cookie(key="sid", httponly=True, samesite="lax", secure=secure, path="/")
     return {"status": "logged_out"}
@@ -94,7 +94,7 @@ async def refresh(response: fastapi.Response,
     new_sid, sess2 = sessions.rotate(sid)
     if not sess2:
         raise fastapi.HTTPException(status_code=401, detail="Invalid session")
-    secure = _secure_cookie_flag(app_state.get_origin())
+    secure = _secure_cookie_flag(app_state.get_api_origin())
     response.set_cookie(key="sid", value=new_sid, httponly=True, samesite="lax", secure=secure, path="/")
     u = users.get_user_by_id(sess2.user_id)
     if not u:

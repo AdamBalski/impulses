@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 
 export default function Tokens() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [tokens, setTokens] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [oauthMessage, setOauthMessage] = useState(null);
   const [creating, setCreating] = useState(false);
   const [newTokenName, setNewTokenName] = useState('');
   const [newTokenCapability, setNewTokenCapability] = useState('SUPER');
@@ -14,6 +18,29 @@ export default function Tokens() {
   useEffect(() => {
     loadTokens();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const oauthStatus = params.get('google_oauth2');
+
+    if (!oauthStatus) return;
+
+    if (oauthStatus === 'authorized') {
+      const tokenName = params.get('token_name');
+      setOauthMessage({
+        type: 'success',
+        text: tokenName ? `Google Calendar connected for token "${tokenName}".` : 'Google Calendar connected.',
+      });
+    } else if (oauthStatus === 'error') {
+      const detail = params.get('detail');
+      setOauthMessage({
+        type: 'error',
+        text: detail ? `Google Calendar connection failed: ${detail}` : 'Google Calendar connection failed.',
+      });
+    }
+
+    navigate('/tokens', { replace: true });
+  }, [location.search, navigate]);
 
   async function loadTokens() {
     try {
@@ -81,6 +108,13 @@ export default function Tokens() {
       <h2>API Tokens</h2>
       <p>Create tokens to authenticate with the Impulses SDK and API.</p>
       <p><strong>For Web UI:</strong> Create a SUPER token and click "Save for Metrics Use" to enable the Metrics page.</p>
+
+      {oauthMessage?.type === 'success' && (
+        <div className="success">{oauthMessage.text}</div>
+      )}
+      {oauthMessage?.type === 'error' && (
+        <div className="error">{oauthMessage.text}</div>
+      )}
 
       {error && <div className="error">{error}</div>}
 

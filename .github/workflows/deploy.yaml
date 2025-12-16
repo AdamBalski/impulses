@@ -36,6 +36,7 @@ jobs:
           PORT: ${{ secrets.PORT }}
           GOOGLE_OAUTH2_CREDS: ${{ secrets.GOOGLE_OAUTH2_CREDS}}
           ORIGIN: ${{ secrets.ORIGIN }}
+          ORIGIN_API: ${{ secrets.ORIGIN_API }}
           POSTGRES_CONN_JSON: ${{ secrets.POSTGRES_CONN_JSON }}
           SESSION_TTL_SEC: ${{ secrets.SESSION_TTL_SEC }}
         run: |

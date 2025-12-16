@@ -212,22 +212,26 @@ export const api = {
   },
 
   async startGoogleOAuthFlow(token) {
+    var body;
     try {
       const response = await fetch(`${API_BASE}/oauth2/google/auth`, {
         headers: {
           'X-Data-Token': token
         },
         credentials: includeCredentials,
-        redirect: 'follow'
       });
-      
-      if (response.redirected) {
-        window.location.href = response.url;
-      }
+      body = await handleResponse(response);
     } catch (err) {
       console.error('OAuth flow error:', err);
       throw new ApiError('Failed to start Google OAuth flow', 0, null);
     }
+
+    const url = body?.url;
+    if (!url) {
+      throw new ApiError('OAuth flow error: missing authorization url', 0, body);
+    }
+
+    window.location.href = url;
   }
 };
 

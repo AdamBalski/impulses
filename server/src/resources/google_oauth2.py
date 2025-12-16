@@ -101,7 +101,7 @@ async def oauth2_callback(
             data=prepare_response_body_for_refresh_token_request(
                 oauth2_state.get_app_creds(),
                 code,
-                app_state.get_origin())
+                app_state.get_api_origin())
         )
 
     try:
@@ -127,15 +127,22 @@ async def oauth2_callback(
             )
             
             logging.info(f"Stored GCal credentials for token {token_id} (user {user_id}, token name {token_name})")
-            
-            return {
-                "status": "authorized",
+
+            ui_url = app_state.get_ui_origin().rstrip("/") + "/tokens"
+            qs = urllib.parse.urlencode({
+                "google_oauth2": "authorized",
+                "token_id": str(token_id),
                 "token_name": token.name,
-                "user_id": user_id
-            }
+            })
+            return responses.RedirectResponse(f"{ui_url}?{qs}")
     except Exception as e:
         logging.error(f"Error during OAuth2 code exchange: {e}")
-        raise
+        ui_url = app_state.get_ui_origin().rstrip("/") + "/tokens"
+        qs = urllib.parse.urlencode({
+            "google_oauth2": "error",
+            "detail": str(e),
+        })
+        return responses.RedirectResponse(f"{ui_url}?{qs}")
     
     raise fastapi.HTTPException(status_code=500, detail="Internal Server Error")
 
@@ -181,12 +188,12 @@ async def redirect_to_google(
     params = {
         "response_type": "code",
         "client_id": client_creds["web"]["client_id"],
-        "redirect_uri": app_state.get_origin() + "/oauth2/google/callback",
+        "redirect_uri": app_state.get_api_origin() + "/oauth2/google/callback",
         "scope": " ".join(SCOPES),
         "access_type": "offline",
         "prompt": "consent",
         "state": state_key  # Pass our state
     }
 
-    return responses.RedirectResponse(f"{base_url}?{urllib.parse.urlencode(params)}")
+    return {"url": f"{base_url}?{urllib.parse.urlencode(params)}"}
 

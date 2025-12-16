@@ -79,7 +79,8 @@ def main():
     app_state = state.set_state(state.AppState(
             status=status,
             google_oauth2_state=state.GoogleOAuth2State(google_oauth2_creds),
-            origin=get_from_env_or_fail("ORIGIN")
+            api_origin=get_from_env_or_fail("ORIGIN_API"),
+            ui_origin=get_from_env_or_fail("ORIGIN")
     )) \
         .provide_obj(data_dao.DataDao(db_dao)) \
         .provide_obj(db_dao) \

@@ -5,7 +5,7 @@ REPO_URL="https://github.com/AdamBalski/impulses"
 
 REF="${REF:-main}"
 
-required_vars=(REMOTE_HOST REMOTE_PORT REMOTE_USERNAME PORT GOOGLE_OAUTH2_CREDS ORIGIN POSTGRES_CONN_JSON)
+required_vars=(REMOTE_HOST REMOTE_PORT REMOTE_USERNAME PORT GOOGLE_OAUTH2_CREDS ORIGIN POSTGRES_CONN_JSON ORIGIN_API)
 
 for var in "${required_vars[@]}"; do
     if [ -z "${!var:-}" ]; then
@@ -41,6 +41,7 @@ ssh "${REMOTE_USERNAME}@${REMOTE_HOST}" -p "$REMOTE_PORT" bash <<EOF
       PORT='$PORT' \
         GOOGLE_OAUTH2_CREDS='$GOOGLE_OAUTH2_CREDS' \
         ORIGIN='$ORIGIN' \
+        ORIGIN_API='$ORIGIN_API' \
         POSTGRES_CONN_JSON='$POSTGRES_CONN_JSON' \
         SESSION_TTL_SEC='${SESSION_TTL_SEC:-1800}' \
         nohup python3 -m src.run IMPULSES_APP > stdout 2>&1 &
