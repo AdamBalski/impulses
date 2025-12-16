@@ -54,7 +54,9 @@ def shutdown_handler(status: health.AppHealth):
 def schedule_jobs(jobs: list[job.Job]):
     scheduler = BackgroundScheduler()
     for job_obj in jobs:
-        scheduler.add_job(job.runner(job_obj), 'interval', seconds=job_obj.interval())
+        runner_fn = job.runner(job_obj)
+        scheduler.add_job(runner_fn, 'date', run_date=datetime.datetime.now(datetime.timezone.utc))
+        scheduler.add_job(runner_fn, 'interval', seconds=job_obj.interval())
     scheduler.start()
 
 def main():

@@ -1,23 +1,31 @@
 @startuml
 actor User
+participant "Impulses UI" as UI
 participant "Impulses Server" as Server
 participant "Google OAuth2" as OAuth2
 participant "Google Calendar API" as GCal
 database "Persistent Datastore" as DB
 
 == OAuth2 Flow ==
-User -> Server : GET /oauth2/google/auth
-Server -> User : Redirect to OAuth2
+User -> UI : Click "Connect Google Calendar"
+UI -> Server : GET /oauth2/google/auth (X-Data-Token)
+Server -> UI : {"url": "..."}
+UI -> OAuth2 : Browser navigates to url
 User -> OAuth2 : Authorize app
-OAuth2 -> User : Redirect back with code
-User -> Server : GET /oauth2/google/callback?code=...
+OAuth2 -> Server : GET /oauth2/google/callback?code=...&state=...
 Server -> OAuth2 : Exchange code for tokens
 OAuth2 -> Server : Return tokens
-Server -> Server : Store user credentials
-== gCal polling job (runs every two minutes) ==
+Server -> DB : Store credentials under gcal/tokens/{token_id}/credentials
+Server -> UI : Redirect to /tokens?google_oauth2=authorized|error
+== gCal polling job (runs every five minutes; also runs once at startup) ==
 Server -> GCal : Fetch events using stored credentials
 GCal -> Server : Return events (e.g. summary: "#!running", description: "distance=10000")
 Server -> DB : Store events as metrics
+
+== Integration status ==
+UI -> Server : GET /oauth2/google/configs (X-Data-Token)
+Server -> DB : Read credentials + sync state
+Server --> UI : JSON configs
 
 == REST API usage ==
 User -> Server : GET /data/imp.events.duration

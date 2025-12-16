@@ -55,7 +55,7 @@ class DataDao:
             set_datapoints(DatapointsDto(dp_list))
 
     def list_metric_names(self, user_id: str) -> list[str]:
-        return self.metric_names_dao.read(self._metric_names_path(user_id))
+        return self.metric_names_dao.read(self._metric_names_path(user_id)).root
     def get_metric_by_metric_name(self, user_id: str, metric_name: str):
         return self.metric_dao.read(self._metric_path(user_id, metric_name))
     def delete_metric_name(self, user_id: str, metric_name: str):
