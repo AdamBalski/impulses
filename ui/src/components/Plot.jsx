@@ -38,7 +38,7 @@ export default function Plot({ data = {}, impulses = [], width = 700, height = 3
         data: sorted
           .map(p => {
             const x = p.timestamp;
-            return x == null ? null : { x, y: p.value };
+            return x == null ? null : { x, y: p.value, dimensions: p.dimensions || {} };
           })
           .filter(Boolean),
         color: impulse.color || '#0066cc',
@@ -66,14 +66,33 @@ export default function Plot({ data = {}, impulses = [], width = 700, height = 3
         borderColor: '#ddd',
       },
       tooltip: {
-        x: {
-          format: 'MMM dd, HH:mm:ss',
+        custom: ({ series, seriesIndex, dataPointIndex, w }) => {
+          const s = w?.config?.series?.[seriesIndex];
+          const point = s?.data?.[dataPointIndex];
+          const x = point?.x;
+          const y = point?.y;
+          const dims = point?.dimensions || {};
+
+          const xText = x == null ? 'N/A' : new Date(x).toLocaleString();
+          const yText = y == null ? 'N/A' : (formatYAsDurationMs ? formatDurationMs(y) : String(y));
+
+          const dimKeys = Object.keys(dims);
+          const dimsHtml = dimKeys.length
+            ? dimKeys
+                .sort()
+                .map(k => `<div><span style="opacity:0.75">${k}</span>: ${String(dims[k])}</div>`)
+                .join('')
+            : '<div style="opacity:0.75">No dimensions</div>';
+
+          return `
+            <div style="padding:8px 10px">
+              <div style="font-weight:600; margin-bottom:4px">${s?.name || ''}</div>
+              <div><span style="opacity:0.75">Time</span>: ${xText}</div>
+              <div><span style="opacity:0.75">Value</span>: ${yText}</div>
+              <div style="margin-top:6px">${dimsHtml}</div>
+            </div>
+          `;
         },
-        y: formatYAsDurationMs
-          ? {
-              formatter: (val) => formatDurationMs(val),
-            }
-          : undefined,
       },
       xaxis: {
         type: 'datetime',
