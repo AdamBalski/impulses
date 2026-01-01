@@ -10,7 +10,8 @@ Main components include the server, background jobs, Google Calendar integration
 | Doc | Description |
 |-----|-------------|
 | [Server README](server/README.md) | How to deploy and run the server, environment variables, token setup, OAuth2 setup. |
-| [Client SDK README](client-sdks/python3/README.md) | How to install and use the client SDK, operations like `map`, `filter`, `sliding_window`. |
+| [Client SDK README (Python)](client-sdks/python3/README.md) | How to install and use the Python client SDK, operations like `map`, `filter`, `sliding_window`. |
+| [Client SDK README (TypeScript)](client-sdks/typescript/README.md) | TypeScript client SDK similar to the python3 one |
 | [GCal Polling Job](server/G_CAL_POLLING_JOB.md) | Details on the background job fetching events from Google Calendar and converting them into metrics. |
 | [Docker Guide](DOCKER.md) | Production Docker Compose setup with PostgreSQL and persistent storage. |
 | [System Tests](system-tests/README.md) | End-to-end integration tests using isolated Docker containers. |
