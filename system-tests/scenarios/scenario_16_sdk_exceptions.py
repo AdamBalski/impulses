@@ -4,9 +4,9 @@ import sys
 import time
 from pathlib import Path
 
-# Add parent directory and client-sdk to path for imports
+# Add parent directory and client SDK to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "client-sdk"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "client-sdks" / "python3"))
 
 import requests
 from utils import get_base_url, assert_true, wait_for_health

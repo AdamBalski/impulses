@@ -152,6 +152,7 @@ Refer to the separate [Google Calendar Polling Job README](./G_CAL_POLLING_JOB.m
     - Fetch datapoints
     - Ingest datapoints
     - Delete metric
+    - Compute virtual metrics
 - `/user` (session-based authentication)
     - Create user account
     - Login (sets session cookie)
@@ -169,6 +170,83 @@ Refer to the separate [Google Calendar Polling Job README](./G_CAL_POLLING_JOB.m
     - Handles the OAuth2 code exchange and stores credentials.
 - `/healthz`
     - Reports whether system is healthy
+
+### Compute endpoints
+
+The server supports on-the-fly computation over existing metrics without persisting results.
+All compute endpoints require `X-Data-Token` with `API` capability.
+
+All compute endpoints return the same response shape as `GET /data/{metric_name}`: a JSON array of datapoints:
+
+```json
+[{"timestamp": 1690000000, "value": 123.0, "dimensions": {"k": "v"}}]
+```
+
+#### 1) `POST /data/compute` (s-expression)
+
+Payload:
+
+```json
+{"expression": "(add (metric \"a\") (metric \"b\"))"}
+```
+
+Supported operators:
+
+- `metric`: `(metric "name")`
+- `const`: `(const 1.23)` (numeric literals are also allowed)
+- arithmetic composition: `(add ...)`, `(sub ...)`, `(mul ...)`, `(div ...)`
+- unary: `(neg <expr>)`, `(abs <expr>)`
+- prefix sum: `(prefix sum <expr>)`
+- sliding window: `(window <int> <op> <expr>)`, where `<op>` is one of `sum|mean|min|max`
+- filter by dimension: `(where <dim_key> <expected> <expr>)`
+- linear transform: `(map <mul:number> <add:number> <expr>)`
+
+Examples:
+
+- cumulative sum:
+
+```lisp
+(prefix sum (metric "transactions"))
+```
+
+- 30-day rolling sum:
+
+```lisp
+(window 30 sum (metric "transactions"))
+```
+
+- filter by dimension and scale:
+
+```lisp
+(map 0.001 0 (where "activity" "Running" (metric "imp.events.duration")))
+```
+
+#### 2) `POST /data/compute-json` (JSON AST)
+
+Payload:
+
+```json
+{
+  "ast": {
+    "op": "add",
+    "args": [
+      {"op": "metric", "name": "a"},
+      {"op": "window", "window": 30, "fn": "sum", "arg": {"op": "metric", "name": "b"}}
+    ]
+  }
+}
+```
+
+AST node forms:
+
+- `{ "op": "metric", "name": "..." }`
+- `{ "op": "const", "value": 1.23 }`
+- `{ "op": "add"|"sub"|"mul"|"div", "args": [node, node, ...] }`
+- `{ "op": "neg"|"abs", "arg": node }`
+- `{ "op": "prefix", "fn": "sum", "arg": node }`
+- `{ "op": "window", "window": 30, "fn": "sum"|"mean"|"min"|"max", "arg": node }`
+- `{ "op": "where", "key": "dim", "eq": "value", "arg": node }`
+- `{ "op": "map", "mul": 1.0, "add": 0.0, "arg": node }`
 
 ---
 

@@ -12,7 +12,7 @@ Clone the repo and if your client code is in a different directory than the SDK,
 git clone https://github.com/AdamBalski/impulses ./path/to/your/impulses
 python3 -m venv venv
 source venv/bin/activate
-pip install -e ./path/to/your/impulses/client-sdk
+pip install -e ./path/to/your/impulses/client-sdks/python3
 ```
 
 This ensures your client code can import `impulses_sdk` while keeping it editable for local updates.
