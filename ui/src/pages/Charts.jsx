@@ -142,6 +142,14 @@ function ChartForm({
                 value={variable.color}
                 onChange={e => handleVariableChange(idx, 'color', e.target.value)}
               />
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <input
+                  type="checkbox"
+                  checked={!!variable.useRightAxis}
+                  onChange={e => handleVariableChange(idx, 'useRightAxis', e.target.checked)}
+                />
+                Right axis
+              </label>
               <button type="button" onClick={() => handleRemoveVariable(idx)}>Remove</button>
             </div>
           ))}
@@ -197,7 +205,10 @@ export default function Charts() {
     setFormName(chart.name);
     setFormDescription(chart.description || '');
     setFormProgram(chart.program || '');
-    setFormVariables([...chart.variables]);
+    setFormVariables(chart.variables.map(variable => ({
+      ...variable,
+      useRightAxis: !!variable.useRightAxis,
+    })));
     setFormFormatYAsDurationMs(!!chart.formatYAsDurationMs);
     setEditingChart(chart);
     setShowForm(true);
@@ -206,7 +217,7 @@ export default function Charts() {
   function handleAddVariable() {
     setFormVariables([
       ...formVariables,
-      { variable: '', color: DEFAULT_COLOR, displayType: 'line' },
+      { variable: '', color: DEFAULT_COLOR, displayType: 'line', useRightAxis: false },
     ]);
   }
 
@@ -228,7 +239,12 @@ export default function Charts() {
       name: formName,
       description: formDescription,
       program: formProgram,
-      variables: formVariables.filter(v => v.variable.trim()),
+      variables: formVariables
+        .filter(v => v.variable.trim())
+        .map(v => ({
+          ...v,
+          useRightAxis: !!v.useRightAxis,
+        })),
       formatYAsDurationMs: !!formFormatYAsDurationMs,
       createdAt: editingChart?.createdAt || Date.now(),
       updatedAt: Date.now(),

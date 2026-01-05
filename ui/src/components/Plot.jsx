@@ -40,8 +40,30 @@ export default function Plot({
   height = 300,
   formatYAsDurationMs = false,
   xRange = null,
-  yRange = null,
+  yRanges = { left: null, right: null },
 }) {
+  const { hasLeftAxis, hasRightAxis, firstLeftName, firstRightName } = useMemo(() => {
+    let firstLeft = null;
+    let firstRight = null;
+    for (const variable of variables) {
+      if (!variable.useRightAxis && !firstLeft) {
+        firstLeft = variable.variable;
+      }
+      if (variable.useRightAxis && !firstRight) {
+        firstRight = variable.variable;
+      }
+      if (firstLeft && firstRight) {
+        break;
+      }
+    }
+    return {
+      hasLeftAxis: firstLeft != null,
+      hasRightAxis: firstRight != null,
+      firstLeftName: firstLeft || undefined,
+      firstRightName: firstRight || undefined,
+    };
+  }, [variables]);
+
   const { series, hasData } = useMemo(() => {
     let hasData = false;
 
@@ -72,6 +94,33 @@ export default function Plot({
   }, [data, variables]);
 
   const options = useMemo(() => {
+    const yaxis = variables.map((variable) => ({
+      seriesName: variable.useRightAxis ? firstRightName : firstLeftName,
+      min: variable.useRightAxis
+        ? yRanges?.right?.min ?? undefined
+        : yRanges?.left?.min ?? undefined,
+      max: variable.useRightAxis
+        ? yRanges?.right?.max ?? undefined
+        : yRanges?.left?.max ?? undefined,
+      opposite: !!variable.useRightAxis,
+      labels: {
+        style: { fontSize: '10px' },
+        formatter: formatYAsDurationMs ? (val) => formatDurationMs(val) : (val) => formatNumber(val),
+      },
+      tickAmount: 8,
+    }));
+
+    if (yaxis.length === 0) {
+      yaxis.push({
+        seriesName: undefined,
+        labels: {
+          style: { fontSize: '10px' },
+          formatter: formatYAsDurationMs ? (val) => formatDurationMs(val) : (val) => formatNumber(val),
+        },
+        tickAmount: 8,
+      });
+    }
+
     return {
       chart: {
         toolbar: { show: true },
@@ -89,6 +138,7 @@ export default function Plot({
       },
       markers: {
         size: variables.map(i => (i.displayType === 'dots' ? 4 : 0)),
+        strokeColors: 'transparent',
       },
       plotOptions: {
         bar: {
@@ -146,19 +196,11 @@ export default function Plot({
           },
         },
       },
-      yaxis: {
-        min: yRange?.min ?? undefined,
-        max: yRange?.max ?? undefined,
-        labels: {
-          style: { fontSize: '10px' },
-          formatter: formatYAsDurationMs ? (val) => formatDurationMs(val) : (val) => formatNumber(val),
-        },
-        tickAmount: 8,
-      },
+      yaxis,
       legend: { show: false },
       colors: variables.map(i => i.color || '#0066cc'),
     };
-  }, [formatYAsDurationMs, variables, xRange, yRange]);
+  }, [formatYAsDurationMs, variables, xRange, yRanges, firstLeftName, firstRightName]);
 
   if (!hasData) {
     return (

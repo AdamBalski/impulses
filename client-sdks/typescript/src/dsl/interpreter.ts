@@ -180,6 +180,9 @@ class DslRuntime {
     this.defineNative("window", (seriesValue, durationValue, aggregateValue) => {
       const series = expectSeries(seriesValue);
       const duration = parseDuration(expectString(durationValue));
+      if (duration === 0) {
+          throw new Error("Duration of a window must be non-zero");
+      }
       const aggregateFn = expectFunction(aggregateValue);
       return series.slidingWindow(duration, async (values) => {
         const result = await this.callFunction(aggregateFn, [values]);
@@ -203,6 +206,29 @@ class DslRuntime {
       return series.bucketize(duration, async (values) => {
         const result = await this.callFunction(aggregateFn, [values]);
         return expectNumber(result);
+      });
+    });
+
+    this.defineNative("bucketize-months", (seriesValue, monthsValue, aggregateValue) => {
+      const series = expectSeries(seriesValue);
+      const months = expectNumber(monthsValue);
+      const aggregateFn = expectFunction(aggregateValue);
+      return series.bucketizeMonths(months, async (values) => {
+        const result = await this.callFunction(aggregateFn, [values]);
+        return expectNumber(result);
+      });
+    });
+
+    this.defineNative("shift", (durationValue, seriesValue) => {
+      const duration = parseDuration(expectString(durationValue));
+      const series = expectSeries(seriesValue);
+      return series.shift(duration);
+    });
+
+    this.defineNative("before-now", () => {
+      return makeNativeFunction("before-now-predicate", (_value, dpValue) => {
+        const datapoint = expectDatapoint(dpValue);
+        return datapoint.timestamp < Date.now();
       });
     });
 

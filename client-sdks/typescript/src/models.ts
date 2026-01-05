@@ -1,4 +1,4 @@
-import { startOfDay } from "./internal/utils.js";
+import { addMonths, startOfDay, startOfYear } from "./internal/utils.js";
 
 export type Dimensions = Record<string, string>;
 
@@ -105,6 +105,13 @@ export class DatapointSeries implements Iterable<Datapoint>, EvaluatedImpulse {
   async map(mapper: (dp: Datapoint) => Promise<Datapoint>): Promise<DatapointSeries> {
     const mapped = await Promise.all(this.series.map((dp) => mapper(dp)));
     return new DatapointSeries(mapped, this.initValue);
+  }
+
+  shift(durationMs: number): DatapointSeries {
+    const shifted = this.series.map(
+      (dp) => new Datapoint(dp.timestamp + durationMs, dp.value, dp.dimensions)
+    );
+    return new DatapointSeries(shifted, this.initValue);
   }
 
   async prefixOp(operation: (values: number[]) => Promise<number>): Promise<DatapointSeries> {
@@ -228,6 +235,48 @@ export class DatapointSeries implements Iterable<Datapoint>, EvaluatedImpulse {
       while (dp.timestamp >= currentStart + duration) {
         await flush();
         currentStart += duration;
+      }
+      bucketValues.push(dp.value);
+    }
+
+    await flush();
+
+    return new DatapointSeries(datapoints, this.initValue);
+  }
+
+  async bucketizeMonths(
+    months: number,
+    aggregate: (values: number[]) => Promise<number>
+  ): Promise<DatapointSeries> {
+    if (!Number.isInteger(months) || months <= 0) {
+      throw new Error("Bucket size (months) must be a positive integer");
+    }
+    if (this.isEmpty()) {
+      return new DatapointSeries([], this.initValue);
+    }
+
+    const firstTimestamp = this.series[0].timestamp;
+    const firstDate = new Date(firstTimestamp);
+    const monthIndex = Math.floor(firstDate.getUTCMonth() / months);
+    let currentStart = addMonths(startOfYear(firstTimestamp), monthIndex * months);
+    let nextStart = addMonths(currentStart, months);
+
+    const datapoints: Datapoint[] = [];
+    let bucketValues: number[] = [];
+
+    const flush = async () => {
+      const aggregateValue = bucketValues.length
+        ? await aggregate(bucketValues)
+        : this.initValue;
+      datapoints.push(new Datapoint(currentStart, aggregateValue));
+      bucketValues = [];
+    };
+
+    for (const dp of this.series) {
+      while (dp.timestamp >= nextStart) {
+        await flush();
+        currentStart = nextStart;
+        nextStart = addMonths(currentStart, months);
       }
       bucketValues.push(dp.value);
     }

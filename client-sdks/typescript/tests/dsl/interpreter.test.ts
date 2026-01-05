@@ -34,7 +34,7 @@ describe("DSL interpreter", () => {
       (define threshold 10)
     `;
 
-    const result = await compute(client, program);
+    const result = await compute(client, "", program);
 
     expect(result.has("threshold")).toBe(false);
     expect(result.get("deltas")?.toDTO()).toEqual(deltas.toDTO());
@@ -120,7 +120,7 @@ describe("DSL interpreter", () => {
                    (/ balance avg))))
     `;
 
-    const result = await compute(client, program);
+    const result = await compute(client, "", program);
 
     expect(result.get("income")?.toDTO()).toEqual([
         { timestamp: 120_000, value: 10, dimensions: { category: "income", method: "transfer" } }

@@ -8,17 +8,21 @@ export default function Chart({ chart, onUpdate, onDelete }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [xRange, setXRange] = useState(null);
-  const [yRange, setYRange] = useState(null);
+  const [yRanges, setYRanges] = useState({ left: null, right: null });
 
   const variables = useMemo(() => {
     if (Array.isArray(chart.variables) && chart.variables.length > 0) {
-      return chart.variables;
+      return chart.variables.map((variable) => ({
+        ...variable,
+        useRightAxis: Boolean(variable.useRightAxis),
+      }));
     }
     const legacy = Array.isArray(chart.impulses) ? chart.impulses : [];
     return legacy.map((impulse, idx) => ({
       variable: impulse?.impulse_expression || `series_${idx + 1}`,
       color: impulse?.color || '#0066cc',
       displayType: impulse?.displayType || 'line',
+      useRightAxis: false,
     }));
   }, [chart.variables, chart.impulses]);
 
@@ -63,7 +67,7 @@ export default function Chart({ chart, onUpdate, onDelete }) {
 
       setData(nextData);
       setXRange(null);
-      setYRange(null);
+      setYRanges({ left: null, right: null });
     } catch (err) {
       console.error('Failed to load chart data', err);
       setError(err?.message || 'Failed to load data');
@@ -92,10 +96,15 @@ export default function Chart({ chart, onUpdate, onDelete }) {
     { label: 'W', durationMs: 7 * 24 * 60 * 60 * 1000 },
   ];
 
-  function getYBounds(start, end) {
+  function getAxisBounds(start, end, axis) {
     let min = Infinity;
     let max = -Infinity;
-    for (const series of Object.values(data)) {
+    for (const variable of variables) {
+      const targetAxis = variable.useRightAxis ? 'right' : 'left';
+      if (targetAxis !== axis) {
+        continue;
+      }
+      const series = data[variable.variable] ?? [];
       for (const point of series ?? []) {
         const ts = point?.timestamp;
         const val = point?.value;
@@ -125,7 +134,10 @@ export default function Chart({ chart, onUpdate, onDelete }) {
     const end = Date.now();
     const start = timeBounds.min != null ? Math.max(timeBounds.min, end - durationMs) : end - durationMs;
     setXRange({ min: start, max: end });
-    setYRange(getYBounds(start, end));
+    setYRanges({
+      left: getAxisBounds(start, end, 'left'),
+      right: getAxisBounds(start, end, 'right'),
+    });
   }
 
   return (
@@ -160,14 +172,20 @@ export default function Chart({ chart, onUpdate, onDelete }) {
         variables={variables}
         formatYAsDurationMs={!!chart.formatYAsDurationMs}
         xRange={xRange}
-        yRange={yRange}
+        yRanges={{
+          left: variables.some(v => !v.useRightAxis) ? yRanges.left : null,
+          right: variables.some(v => v.useRightAxis) ? yRanges.right : null,
+        }}
       />
 
       <div className="chart-legend">
         {variables.map((variable, idx) => (
           <div key={idx} className="legend-item">
             <span className="legend-color" style={{ backgroundColor: variable.color || '#0066cc' }} />
-            <span>{variable.variable}</span>
+            <span>
+              {variable.variable}
+              {variable.useRightAxis ? ' (Right axis)' : ''}
+            </span>
           </div>
         ))}
       </div>

@@ -4,8 +4,23 @@ export function startOfDay(timestamp: number): number {
   return Math.floor(timestamp / DAY_MS) * DAY_MS;
 }
 
+export function startOfYear(timestamp: number): number {
+  const date = new Date(timestamp);
+  date.setUTCMonth(0, 1);
+  date.setUTCHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
+export function addMonths(timestamp: number, months: number): number {
+  const date = new Date(timestamp);
+  date.setUTCDate(1);
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCMonth(date.getUTCMonth() + months);
+  return date.getTime();
+}
+
 export function parseDuration(duration: string): number {
-  const regex = /(\d+)(d|h|min|m|s|ms)/g;
+  const regex = /(-?\d+)(d|h|min|ms|m|s)/g;
   let match: RegExpExecArray | null;
   let total = 0;
   while ((match = regex.exec(duration)) !== null) {
@@ -31,9 +46,6 @@ export function parseDuration(duration: string): number {
       default:
         throw new Error(`Unknown duration unit '${unit}'`);
     }
-  }
-  if (total === 0) {
-    throw new Error(`Invalid duration string '${duration}'`);
   }
   return total;
 }
