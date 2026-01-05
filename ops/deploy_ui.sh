@@ -16,8 +16,15 @@ repo_root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 ui_src_dir="$repo_root_dir/ui"
 ui_dist_dir="$ui_src_dir/dist"
+ts_sdk_dir="$repo_root_dir/client-sdks/typescript"
 
 rm -rf "$ui_dist_dir"
+
+(
+    cd "$ts_sdk_dir"
+    npm ci
+    npm run build
+)
 
 (
     cd "$ui_src_dir"
