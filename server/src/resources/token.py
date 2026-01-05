@@ -43,9 +43,9 @@ async def create_token(body: CreateTokenBody,
                        u = fastapi.Depends(user_auth.get_current_user)) -> TokenCreatedDto:
     if body.capability not in ("API", "INGEST", "SUPER"):
         raise fastapi.HTTPException(status_code=422, detail="Invalid capability")
-    # Max liveness 1 year
+    # Max liveness 2 years
     now = int(time.time())
-    max_exp = now + 365 * 24 * 3600
+    max_exp = now + 2 * 365 * 24 * 3600
     exp = body.expires_at if body.expires_at is not None else max_exp
     if exp > max_exp:
         exp = max_exp

@@ -2,12 +2,15 @@
   "name": "@impulses/sdk-typescript",
   "version": "0.1.0",
   "description": "Impulses client SDK for TypeScript",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist",
-    "lint": "tsc -p tsconfig.json --noEmit"
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "prepare": "npm run build"
   },
   "keywords": [
     "impulses",
@@ -20,6 +23,7 @@
     "cross-fetch": "^3.1.8"
   },
   "devDependencies": {
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.2"
   }
 }

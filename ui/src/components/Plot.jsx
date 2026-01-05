@@ -22,45 +22,78 @@ function formatDurationMs(ms) {
   return sign + parts.join(' ');
 }
 
-export default function Plot({ data = {}, impulses = [], width = 700, height = 300, formatYAsDurationMs = false }) {
+function formatNumber(val) {
+  if (val == null || Number.isNaN(val)) {
+    return '';
+  }
+  const abs = Math.abs(val);
+  if ((abs >= 1_000_000_000 || abs < 0.01) && abs != 0) {
+    return val.toExponential(2);
+  }
+  return Number(val.toFixed(6)).toString();
+}
+
+export default function Plot({
+  data = {},
+  variables = [],
+  width = 700,
+  height = 300,
+  formatYAsDurationMs = false,
+  xRange = null,
+  yRange = null,
+}) {
   const { series, hasData } = useMemo(() => {
     let hasData = false;
 
-    const series = impulses.map(impulse => {
-      const points = data[impulse.impulse_expression] || [];
+    const series = variables.map(variable => {
+      const variableName = variable.variable;
+      const points = data[variableName] || [];
       if (points.length > 0) hasData = true;
 
       const sorted = [...points].sort((a, b) => a.timestamp ?? 0 - b.timestamp ?? 0);
-      const displayType = impulse.displayType || 'line';
+      const displayType = variable.displayType || 'line';
+      const apexSeriesType =
+        displayType === 'dots' ? 'scatter' : displayType === 'bar' ? 'column' : 'line';
 
       return {
-        name: impulse.impulse_expression,
+        name: variableName,
         data: sorted
           .map(p => {
             const x = p.timestamp;
             return x == null ? null : { x, y: p.value, dimensions: p.dimensions || {} };
           })
           .filter(Boolean),
-        color: impulse.color || '#0066cc',
-        type: displayType === 'dots' ? 'scatter' : 'line',
+        color: variable.color || '#0066cc',
+        type: apexSeriesType,
       };
     });
 
     return { series, hasData };
-  }, [data, impulses]);
+  }, [data, variables]);
 
   const options = useMemo(() => {
     return {
       chart: {
-        toolbar: { show: false },
+        toolbar: { show: true },
+        zoom: { enabled: true, type: 'xy' },
         animations: { enabled: false },
       },
       stroke: {
-        width: impulses.map(i => i.displayType === 'dots' ? 0 : 2),
+        width: variables.map(i => {
+          if (i.displayType === 'dots' || i.displayType === 'bar') {
+            return 0;
+          }
+          return 2;
+        }),
         curve: 'straight',
       },
       markers: {
-        size: impulses.map(i => i.displayType === 'dots' ? 4 : 0),
+        size: variables.map(i => (i.displayType === 'dots' ? 4 : 0)),
+      },
+      plotOptions: {
+        bar: {
+          columnWidth: '60%',
+        },
       },
       grid: {
         borderColor: '#ddd',
@@ -74,7 +107,7 @@ export default function Plot({ data = {}, impulses = [], width = 700, height = 3
           const dims = point?.dimensions || {};
 
           const xText = x == null ? 'N/A' : new Date(x).toLocaleString();
-          const yText = y == null ? 'N/A' : (formatYAsDurationMs ? formatDurationMs(y) : String(y));
+          const yText = y == null ? 'N/A' : (formatYAsDurationMs ? formatDurationMs(y) : formatNumber(y));
 
           const dimKeys = Object.keys(dims);
           const dimsHtml = dimKeys.length
@@ -96,6 +129,8 @@ export default function Plot({ data = {}, impulses = [], width = 700, height = 3
       },
       xaxis: {
         type: 'datetime',
+        min: xRange?.min ?? undefined,
+        max: xRange?.max ?? undefined,
         tooltip: {
           enabled: false,
         },
@@ -112,15 +147,18 @@ export default function Plot({ data = {}, impulses = [], width = 700, height = 3
         },
       },
       yaxis: {
+        min: yRange?.min ?? undefined,
+        max: yRange?.max ?? undefined,
         labels: {
           style: { fontSize: '10px' },
-          formatter: formatYAsDurationMs ? (val) => formatDurationMs(val) : undefined,
+          formatter: formatYAsDurationMs ? (val) => formatDurationMs(val) : (val) => formatNumber(val),
         },
+        tickAmount: 8,
       },
       legend: { show: false },
-      colors: impulses.map(i => i.color || '#0066cc'),
+      colors: variables.map(i => i.color || '#0066cc'),
     };
-  }, [formatYAsDurationMs, impulses]);
+  }, [formatYAsDurationMs, variables, xRange, yRange]);
 
   if (!hasData) {
     return (

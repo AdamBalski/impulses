@@ -19,7 +19,8 @@
     "react-plotly.js": "^2.6.0",
     "react-router-dom": "^6.20.0",
     "recharts": "^2.10.0",
-    "plotly.js": "^2.27.0"
+    "plotly.js": "^2.27.0",
+    "@impulses/sdk-typescript": "file:../client-sdks/typescript"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",

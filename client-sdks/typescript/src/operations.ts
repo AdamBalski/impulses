@@ -1,5 +1,5 @@
-import { ConstantImpulse, Datapoint, DatapointSeries, EvaluatedImpulse } from "./models";
-import { MinHeap } from "./internal/minHeap";
+import { ConstantImpulse, Datapoint, DatapointSeries, EvaluatedImpulse } from "./models.js";
+import { MinHeap } from "./internal/minHeap.js";
 
 interface HeapEntry {
   time: number;
@@ -7,17 +7,17 @@ interface HeapEntry {
   idx: number;
 }
 
-export function composeImpulses(
+export async function composeImpulses(
   impulses: EvaluatedImpulse[],
-  operation: (values: number[]) => number
-): EvaluatedImpulse {
+  operation: (values: number[]) => Promise<number> | number
+): Promise<DatapointSeries> {
   if (impulses.length === 0) {
-    return new ConstantImpulse(0);
+    return new DatapointSeries();
   }
 
   const indices = new Array(impulses.length).fill(0);
   const lastValues = impulses.map((impulse) => impulse.getInitVal());
-  const newInit = operation(impulses.map((impulse) => impulse.getInitVal()));
+  const initValue = await Promise.resolve(operation([...lastValues]));
 
   const heap = new MinHeap<HeapEntry>((a, b) => a.time - b.time);
   let hasSeries = false;
@@ -41,7 +41,7 @@ export function composeImpulses(
   });
 
   if (!hasSeries) {
-    return new ConstantImpulse(newInit);
+    return new DatapointSeries([], initValue);
   }
 
   const datapointSeriesCache = impulses.map((impulse) =>
@@ -56,7 +56,7 @@ export function composeImpulses(
 
     indices[seriesIdx] += 1;
     if (indices[seriesIdx] < series.length) {
-      const next = series[indices[seriesIdx]];
+      const next = series.series[indices[seriesIdx]];
       heap.push({
         time: next.timestamp,
         value: next.value,
@@ -67,14 +67,15 @@ export function composeImpulses(
 
   const head = heap.peek();
   if (!head) {
-    return new ConstantImpulse(newInit);
+    return new DatapointSeries([], initValue);
   }
 
   let currentTime = head.time;
   const result: Datapoint[] = [];
 
-  const flush = (nextTime: number) => {
-    result.push(new Datapoint(currentTime, operation([...lastValues])));
+  const flush = async (nextTime: number) => {
+    const value = await Promise.resolve(operation([...lastValues]));
+    result.push(new Datapoint(currentTime, value));
     currentTime = nextTime;
   };
 
@@ -84,12 +85,12 @@ export function composeImpulses(
     lastTime = entry.time;
     maybePushFrom(entry.idx);
     if (entry.time > currentTime) {
-      flush(entry.time);
+      await flush(entry.time);
     }
     lastValues[entry.idx] = entry.value;
   }
 
-  flush(lastTime);
+  await flush(lastTime);
 
-  return new DatapointSeries(result, newInit);
+  return new DatapointSeries(result, initValue);
 }

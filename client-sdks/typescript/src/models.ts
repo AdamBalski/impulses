@@ -1,3 +1,5 @@
+import { startOfDay } from "./internal/utils.js";
+
 export type Dimensions = Record<string, string>;
 
 export interface DatapointDTO {
@@ -94,35 +96,33 @@ export class DatapointSeries implements Iterable<Datapoint>, EvaluatedImpulse {
     return this.series[idx]?.value ?? this.initValue;
   }
 
-  filter(predicate: (dp: Datapoint) => boolean): DatapointSeries {
-    return new DatapointSeries(
-      this.series.filter(predicate),
-      this.initValue
-    );
+  async filter(predicate: (dp: Datapoint) => Promise<boolean>): Promise<DatapointSeries> {
+    const decisions = await Promise.all(this.series.map((dp) => predicate(dp)));
+    const filtered = this.series.filter((_, idx) => decisions[idx]);
+    return new DatapointSeries(filtered, this.initValue);
   }
 
-  map(mapper: (dp: Datapoint) => Datapoint): DatapointSeries {
-    return new DatapointSeries(
-      this.series.map(mapper),
-      this.initValue
-    );
+  async map(mapper: (dp: Datapoint) => Promise<Datapoint>): Promise<DatapointSeries> {
+    const mapped = await Promise.all(this.series.map((dp) => mapper(dp)));
+    return new DatapointSeries(mapped, this.initValue);
   }
 
-  prefixOp(operation: (values: number[]) => number): DatapointSeries {
+  async prefixOp(operation: (values: number[]) => Promise<number>): Promise<DatapointSeries> {
     let prev = this.initValue;
-    const nextSeries = this.series.map((dp) => {
-      prev = operation([prev, dp.value]);
-      return new Datapoint(dp.timestamp, prev, dp.dimensions);
-    });
-    const nextInit = operation([this.initValue]);
+    const nextSeries: Datapoint[] = [];
+    for (const dp of this.series) {
+      prev = await operation([prev, dp.value]);
+      nextSeries.push(new Datapoint(dp.timestamp, prev, dp.dimensions));
+    }
+    const nextInit = await operation([this.initValue]);
     return new DatapointSeries(nextSeries, nextInit);
   }
 
-  slidingWindow(
+  async slidingWindow(
     window: number,
-    operation: (values: number[]) => number,
+    operation: (values: number[]) => Promise<number>,
     fluidPhaseOut = true
-  ): DatapointSeries {
+  ): Promise<DatapointSeries> {
     if (this.isEmpty()) {
       return new DatapointSeries([], this.initValue);
     }
@@ -145,7 +145,7 @@ export class DatapointSeries implements Iterable<Datapoint>, EvaluatedImpulse {
     const lastTimestamp = this.series[this.series.length - 1].timestamp;
     const counts = new Map<number, number>();
     let activeCount = 0;
-    const result: Datapoint[] = [];
+    const bucketPromises: Promise<Datapoint>[] = [];
 
     while (events.length > 0) {
       const event = events.shift()!;
@@ -176,7 +176,7 @@ export class DatapointSeries implements Iterable<Datapoint>, EvaluatedImpulse {
       }
 
       if (activeCount === 0) {
-        result.push(new Datapoint(event.time, this.initValue));
+        bucketPromises.push(Promise.resolve(new Datapoint(event.time, this.initValue)));
         continue;
       }
 
@@ -186,13 +186,54 @@ export class DatapointSeries implements Iterable<Datapoint>, EvaluatedImpulse {
           values.push(value);
         }
       });
-      result.push(new Datapoint(event.time, operation(values)));
+      bucketPromises.push(
+        operation(values).then((aggregateValue) => new Datapoint(event.time, aggregateValue))
+      );
     }
 
-    if (fluidPhaseOut && result.length > 0) {
-      result.pop();
+    const datapoints = await Promise.all(bucketPromises);
+    if (fluidPhaseOut && datapoints.length > 0) {
+      datapoints.pop();
     }
 
-    return new DatapointSeries(result, this.initValue);
+    return new DatapointSeries(datapoints, this.initValue);
+  }
+
+  async bucketize(
+    duration: number,
+    aggregate: (values: number[]) => Promise<number>
+  ): Promise<DatapointSeries> {
+    if (duration <= 0) {
+      throw new Error("Bucket duration must be positive");
+    }
+    if (this.isEmpty()) {
+      return new DatapointSeries([], this.initValue);
+    }
+
+    const firstTimestamp = this.series[0].timestamp;
+    const anchor = startOfDay(firstTimestamp);
+    let currentStart = anchor + Math.floor((firstTimestamp - anchor) / duration) * duration;
+    const datapoints: Datapoint[] = [];
+    let bucketValues: number[] = [];
+
+    const flush = async () => {
+      const aggregateValue = bucketValues.length
+            ? await aggregate(bucketValues)
+            : this.initValue;
+      datapoints.push(new Datapoint(currentStart, aggregateValue));
+      bucketValues = [];
+    };
+
+    for (const dp of this.series) {
+      while (dp.timestamp >= currentStart + duration) {
+        await flush();
+        currentStart += duration;
+      }
+      bucketValues.push(dp.value);
+    }
+
+    await flush();
+
+    return new DatapointSeries(datapoints, this.initValue);
   }
 }

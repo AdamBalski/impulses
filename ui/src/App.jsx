@@ -49,7 +49,7 @@ function Navigation() {
       <Link to="/tokens">Tokens</Link>
       <Link to="/gcal">GCal integration</Link>
       <Link to="/charts">Charts</Link>
-      <button onClick={logout} style={{ float: 'right' }}>Logout</button>
+      <button onClick={logout} style={{ float: 'right', marginTop: '-5px' }}>Logout</button>
     </nav>
   );
 }
@@ -57,7 +57,10 @@ function Navigation() {
 function AppContent() {
   return (
     <>
-      <h1>Impulses</h1>
+      <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <img src="/favicon.svg" alt="Impulses logo" width="64" height="64" />
+        Impulses
+      </h1>
       <Navigation />
       <Routes>
         <Route path="/login" element={

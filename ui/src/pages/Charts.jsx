@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
+import { format as formatPulseProgram } from '@impulses/sdk-typescript';
 import Chart from '../components/Chart';
 
 const STORAGE_KEY = 'impulses_charts';
+const DEFAULT_COLOR = '#0066cc';
 
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -27,15 +29,34 @@ function ChartForm({
   setFormName,
   formDescription,
   setFormDescription,
-  formImpulses,
+  formProgram,
+  setFormProgram,
+  formVariables,
   formFormatYAsDurationMs,
   setFormFormatYAsDurationMs,
-  handleImpulseChange,
-  handleRemoveImpulse,
-  handleAddImpulse,
+  handleVariableChange,
+  handleRemoveVariable,
+  handleAddVariable,
   handleSubmit,
   onCancel,
 }) {
+  const programTextareaRef = useRef(null);
+
+  useEffect(() => {
+    if (programTextareaRef.current) {
+      const textarea = programTextareaRef.current;
+      textarea.style.height = 'auto';
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+  }, [formProgram]);
+
+  const handleProgramChange = (e) => {
+    const textarea = e.target;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+    setFormProgram(textarea.value);
+  };
+
   return (
     <div className="card chart-form">
       <h3>{title}</h3>
@@ -60,6 +81,34 @@ function ChartForm({
           />
         </div>
 
+        <div>
+          <label>PulseLang Program</label>
+          <textarea
+            ref={programTextareaRef}
+            value={formProgram}
+            onChange={handleProgramChange}
+            placeholder={'(define foo (data "metric"))'}
+            rows={6}
+            style={{ width: '100%', maxWidth: 'none' }}
+            required
+          />
+          <div className="button-group" style={{ marginTop: '0.5rem' }}>
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  const formatted = formatPulseProgram(formProgram);
+                  setFormProgram(formatted);
+                } catch (err) {
+                  alert(`Failed to format program: ${err instanceof Error ? err.message : err}`);
+                }
+              }}
+            >
+              Format Program
+            </button>
+          </div>
+        </div>
+
         <label style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-start', gap: '6px', whiteSpace: 'nowrap' }}>
           <input
             type="checkbox"
@@ -70,31 +119,33 @@ function ChartForm({
         </label>
 
         <div className="impulses-section">
-          <h4>Impulses (Metrics)</h4>
-          {formImpulses.map((impulse, idx) => (
+          <h4>Variables</h4>
+          {formVariables.map((variable, idx) => (
             <div key={idx} className="impulse-row">
               <input
                 type="text"
-                value={impulse.impulse_expression}
-                onChange={e => handleImpulseChange(idx, 'impulse_expression', e.target.value)}
-                placeholder="Metric name"
+                value={variable.variable}
+                onChange={e => handleVariableChange(idx, 'variable', e.target.value)}
+                placeholder="Variable name"
+                required
               />
               <select
-                value={impulse.displayType || 'line'}
-                onChange={e => handleImpulseChange(idx, 'displayType', e.target.value)}
+                value={variable.displayType || 'line'}
+                onChange={e => handleVariableChange(idx, 'displayType', e.target.value)}
               >
                 <option value="line">Line</option>
                 <option value="dots">Dots</option>
+                <option value="bar">Bars</option>
               </select>
               <input
                 type="color"
-                value={impulse.color}
-                onChange={e => handleImpulseChange(idx, 'color', e.target.value)}
+                value={variable.color}
+                onChange={e => handleVariableChange(idx, 'color', e.target.value)}
               />
-              <button type="button" onClick={() => handleRemoveImpulse(idx)}>Remove</button>
+              <button type="button" onClick={() => handleRemoveVariable(idx)}>Remove</button>
             </div>
           ))}
-          <button type="button" onClick={handleAddImpulse}>Add Impulse</button>
+          <button type="button" onClick={handleAddVariable}>Add Variable</button>
         </div>
 
         <div className="button-group">
@@ -113,7 +164,8 @@ export default function Charts() {
 
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
-  const [formImpulses, setFormImpulses] = useState([]);
+  const [formProgram, setFormProgram] = useState('');
+  const [formVariables, setFormVariables] = useState([]);
   const [formFormatYAsDurationMs, setFormFormatYAsDurationMs] = useState(false);
 
   const isInitialMount = useRef(true);
@@ -129,7 +181,8 @@ export default function Charts() {
   function resetForm() {
     setFormName('');
     setFormDescription('');
-    setFormImpulses([]);
+    setFormProgram('');
+    setFormVariables([]);
     setFormFormatYAsDurationMs(false);
     setEditingChart(null);
     setShowForm(false);
@@ -143,24 +196,28 @@ export default function Charts() {
   function handleEdit(chart) {
     setFormName(chart.name);
     setFormDescription(chart.description || '');
-    setFormImpulses([...chart.impulses]);
+    setFormProgram(chart.program || '');
+    setFormVariables([...chart.variables]);
     setFormFormatYAsDurationMs(!!chart.formatYAsDurationMs);
     setEditingChart(chart);
     setShowForm(true);
   }
 
-  function handleAddImpulse() {
-    setFormImpulses([...formImpulses, { impulse_expression: '', color: '#0066cc', displayType: 'line' }]);
+  function handleAddVariable() {
+    setFormVariables([
+      ...formVariables,
+      { variable: '', color: DEFAULT_COLOR, displayType: 'line' },
+    ]);
   }
 
-  function handleRemoveImpulse(index) {
-    setFormImpulses(formImpulses.filter((_, i) => i !== index));
+  function handleRemoveVariable(index) {
+    setFormVariables(formVariables.filter((_, i) => i !== index));
   }
 
-  function handleImpulseChange(index, field, value) {
-    const updated = [...formImpulses];
+  function handleVariableChange(index, field, value) {
+    const updated = [...formVariables];
     updated[index] = { ...updated[index], [field]: value };
-    setFormImpulses(updated);
+    setFormVariables(updated);
   }
 
   function handleSubmit(e) {
@@ -170,7 +227,8 @@ export default function Charts() {
       id: editingChart?.id || generateId(),
       name: formName,
       description: formDescription,
-      impulses: formImpulses.filter(i => i.impulse_expression.trim()),
+      program: formProgram,
+      variables: formVariables.filter(v => v.variable.trim()),
       formatYAsDurationMs: !!formFormatYAsDurationMs,
       createdAt: editingChart?.createdAt || Date.now(),
       updatedAt: Date.now(),
@@ -211,12 +269,14 @@ export default function Charts() {
           setFormName={setFormName}
           formDescription={formDescription}
           setFormDescription={setFormDescription}
-          formImpulses={formImpulses}
+          formProgram={formProgram}
+          setFormProgram={setFormProgram}
+          formVariables={formVariables}
           formFormatYAsDurationMs={formFormatYAsDurationMs}
           setFormFormatYAsDurationMs={setFormFormatYAsDurationMs}
-          handleImpulseChange={handleImpulseChange}
-          handleRemoveImpulse={handleRemoveImpulse}
-          handleAddImpulse={handleAddImpulse}
+          handleVariableChange={handleVariableChange}
+          handleRemoveVariable={handleRemoveVariable}
+          handleAddVariable={handleAddVariable}
           handleSubmit={handleSubmit}
           onCancel={resetForm}
         />
@@ -236,12 +296,14 @@ export default function Charts() {
               setFormName={setFormName}
               formDescription={formDescription}
               setFormDescription={setFormDescription}
-              formImpulses={formImpulses}
+              formProgram={formProgram}
+              setFormProgram={setFormProgram}
+              formVariables={formVariables}
               formFormatYAsDurationMs={formFormatYAsDurationMs}
               setFormFormatYAsDurationMs={setFormFormatYAsDurationMs}
-              handleImpulseChange={handleImpulseChange}
-              handleRemoveImpulse={handleRemoveImpulse}
-              handleAddImpulse={handleAddImpulse}
+              handleVariableChange={handleVariableChange}
+              handleRemoveVariable={handleRemoveVariable}
+              handleAddVariable={handleAddVariable}
               handleSubmit={handleSubmit}
               onCancel={resetForm}
             />

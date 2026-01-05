@@ -1,5 +1,5 @@
-import fetch, { Response } from "cross-fetch";
-import { DatapointSeries, DatapointDTO } from "./models";
+import fetchPolyfill, { Response } from "cross-fetch";
+import { DatapointSeries, DatapointDTO } from "./models.js";
 import {
   AuthenticationError,
   AuthorizationError,
@@ -8,7 +8,7 @@ import {
   NotFoundError,
   ServerError,
   ValidationError,
-} from "./exceptions";
+} from "./exceptions.js";
 
 export interface ImpulsesClientConfig {
   url: string;
@@ -34,7 +34,13 @@ export class ImpulsesClient {
 
     this.baseUrl = config.url.replace(/\/?$/, "");
     this.timeoutMs = config.timeoutMs ?? 3000;
-    this.fetchImpl = config.fetchImpl ?? fetch;
+    if (config.fetchImpl) {
+      this.fetchImpl = config.fetchImpl;
+    } else if (typeof globalThis.fetch === "function") {
+      this.fetchImpl = globalThis.fetch.bind(globalThis);
+    } else {
+      this.fetchImpl = fetchPolyfill;
+    }
     this.headers = {
       "X-Data-Token": config.tokenValue,
       "Content-Type": "application/json",

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 
+const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+
 export default function Tokens() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -14,6 +16,7 @@ export default function Tokens() {
   const [newTokenCapability, setNewTokenCapability] = useState('SUPER');
   const [createdToken, setCreatedToken] = useState(null);
   const [storedToken, setStoredToken] = useState(localStorage.getItem('impulses_token'));
+  const [newTokenExpiry, setNewTokenExpiry] = useState('');
 
   useEffect(() => {
     loadTokens();
@@ -61,9 +64,20 @@ export default function Tokens() {
 
     try {
       setCreating(true);
-      const token = await api.createToken(newTokenName, newTokenCapability);
+      let expiresAt;
+      if (newTokenExpiry) {
+        const timestamp = new Date(newTokenExpiry).getTime();
+        if (Number.isNaN(timestamp)) {
+          throw new Error('Invalid expiration date');
+        }
+        expiresAt = Math.floor(timestamp / 1000);
+      } else {
+        expiresAt = Math.floor((Date.now() + ONE_YEAR_MS) / 1000);
+      }
+      const token = await api.createToken(newTokenName, newTokenCapability, expiresAt);
       setCreatedToken(token);
       setNewTokenName('');
+      setNewTokenExpiry('');
       loadTokens();
     } catch (err) {
       setError(err.message || 'Failed to create token');
@@ -178,6 +192,18 @@ export default function Tokens() {
               <option value="SUPER">SUPER - Full access</option>
             </select>
           </label>
+
+          <label>
+            Expiration (optional):
+            <input
+              type="datetime-local"
+              value={newTokenExpiry}
+              onChange={(e) => setNewTokenExpiry(e.target.value)}
+            />
+          </label>
+          <small style={{ display: 'block', marginBottom: '1em' }}>
+            Leave blank to default to one year from now. Time is saved in your local timezone.
+          </small>
 
           <button type="submit" disabled={creating}>
             {creating ? 'Creating...' : 'Create Token'}

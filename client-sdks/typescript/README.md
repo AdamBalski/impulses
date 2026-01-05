@@ -29,8 +29,6 @@ Or add via `package.json`:
 }
 ```
 
-The SDK exports ES2015 modules compiled to CommonJS with bundled type definitions.
-
 ---
 
 ## 2. Usage
@@ -40,6 +38,9 @@ import {
   ImpulsesClient,
   Datapoint,
   DatapointSeries,
+  COMMON_LIBRARY,
+  compute,
+  format as formatPulseLang,
 } from "@impulses/sdk-typescript";
 
 const client = new ImpulsesClient({
@@ -65,4 +66,30 @@ const expenses = deltas
 const expenses30d = expenses.slidingWindow(30, (values) =>
   values.reduce((sum, v) => sum + v, 0)
 );
+
+### PulseLang programs
+
+The SDK also embeds the PulseLang interpreter so you can derive streams declaratively:
+
+```ts
+const library = COMMON_LIBRARY; // optional helpers (prefix-sum, buckets, EMA, etc.)
+
+const program = `
+  (define deltas (data "transactions"))
+  (define sum (aggregate-from +))
+  (define expenses (filter deltas (< 0)))
+  (define expenses-30d (window expenses "30d" sum))
+`;
+
+const streams = await compute(client, library, program);
+const expenses30d = streams.get("expenses-30d");
+```
+
+Need to clean up a PulseLang script before saving it? Use the formatter (note that currently it just writes the program from AST and doesn't preserve any custom spacing or comments):
+
+```ts
+const pretty = formatPulseLang(program);
+```
+
+See [`docs/PulseLang.md`](../../docs/PulseLang.md) for the complete language guide, built-in reference, and testing instructions.
 ```

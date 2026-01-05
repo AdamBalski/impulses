@@ -80,11 +80,15 @@ export default function MetricDetail() {
               </tr>
             </thead>
             <tbody>
-              {data.slice(0, 100).map((dp, idx) => (
+              {data.slice(-100).reverse().map((dp, idx) => (
                 <tr key={idx}>
-                  <td>{new Date(dp.timestamp * 1000).toLocaleString()}</td>
+                  <td>{new Date(dp.timestamp).toLocaleString()}</td>
                   <td>{dp.value}</td>
-                  <td>{JSON.stringify(dp.dimensions)}</td>
+                  <td>
+                    <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>
+                      {JSON.stringify(dp.dimensions, null, 2)}
+                    </pre>
+                  </td>
                 </tr>
               ))}
             </tbody>

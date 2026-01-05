@@ -57,6 +57,7 @@ services:
       CHOKIDAR_INTERVAL: "200"
     volumes:
       - ../ui:/app
+      - ../client-sdks/typescript:/client-sdks/typescript
       - /app/node_modules
     depends_on:
       - app
