@@ -245,7 +245,47 @@ export const api = {
       if (err instanceof ApiError) throw err;
       throw new ApiError('Network error: Unable to connect to server', 0, null);
     }
-  }
+  },
+
+  async listLocalStorageEntries() {
+    try {
+      const response = await fetch(`${API_BASE}/local-storage`, {
+        credentials: includeCredentials,
+      });
+      return handleResponse(response);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Network error: Unable to connect to server', 0, null);
+    }
+  },
+
+  async upsertLocalStorageEntry(key, value) {
+    try {
+      const response = await fetch(`${API_BASE}/local-storage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: includeCredentials,
+        body: JSON.stringify({ key, value }),
+      });
+      return handleResponse(response);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Network error: Unable to connect to server', 0, null);
+    }
+  },
+
+  async deleteLocalStorageEntry(entryId) {
+    try {
+      const response = await fetch(`${API_BASE}/local-storage/${entryId}`, {
+        method: 'DELETE',
+        credentials: includeCredentials,
+      });
+      return handleResponse(response);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Network error: Unable to connect to server', 0, null);
+    }
+  },
 };
 
 export { ApiError };

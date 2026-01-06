@@ -2,9 +2,10 @@
 
 .chart-container {
   border: 2px solid #222;
-  padding: 1.5em;
+  padding: .5em;
   margin: 1.5em 0;
   background: #fff;
+  box-sizing: border-box;
 }
 
 .chart-header {
@@ -12,23 +13,37 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1em;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  row-gap: 0.25em;
 }
 
-.chart-header h3 {
+.chart-header h3,
+.chart-header h4,
+.chart-header h5 {
   margin: 0;
 }
 
 .chart-actions {
   display: flex;
   gap: 0.5em;
+  flex-wrap: wrap;
 }
 
 .chart-canvas {
   border: 1px solid #ddd;
-  display: block;
-  width: 700px;
-  height: 300px;
-  max-width: 100%;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.chart-canvas .apexcharts-canvas,
+.chart-canvas svg,
+.chart-canvas .apexcharts-inner {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .chart-canvas--empty {
@@ -46,8 +61,8 @@
 .chart-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 1em;
-  margin-top: 1em;
+  gap: 0.45em;
+  margin-top: 0.25em;
 }
 
 .legend-item {
@@ -109,7 +124,7 @@
 }
 
 .chart-wrapper {
-  margin-bottom: 2em;
+  margin-bottom: 1em;
 }
 
 .edit-chart-btn {
@@ -120,4 +135,134 @@
   .impulse-row {
     flex-wrap: wrap;
   }
+}
+
+/* Dashboard picker */
+.dashboard-picker {
+  margin-bottom: 1em;
+}
+
+.dashboard-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.dashboard-tab {
+  padding: 0.5em 1em;
+  border: 2px solid #222;
+  background: #fff;
+  color: #222;
+  text-decoration: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.dashboard-tab:last-child {
+  border-right: 2px solid #222;
+}
+
+.dashboard-tab:hover {
+  background: #888;
+  color: #fff;
+}
+
+.dashboard-tab.active {
+  background: #000;
+  color: #fff;
+}
+
+/* Dashboard editor - reuses .card style pattern */
+.dashboard-editor {
+  border: 2px solid #222;
+  padding: 1.5em;
+  margin: 1em 0;
+  background: #fff;
+}
+
+.dashboard-tab--new {
+    margin-left: 1em;
+}
+
+.dashboard-editor h3 {
+  margin: 0 0 1em 0;
+}
+
+.form-row {
+  margin-bottom: 1em;
+}
+
+.form-row label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.25em;
+}
+
+.form-row input[disabled] {
+  background: #f5f5f5;
+  color: #666;
+  cursor: not-allowed;
+}
+
+/* Layout editor list - reuses .impulse-row pattern */
+.layout-list {
+  border: 2px solid #222;
+  padding: 1em;
+  background: #fff;
+  width: 100%;
+}
+
+.layout-row {
+  display: flex;
+  gap: 0.5em;
+  align-items: center;
+  margin-bottom: 0.5em;
+}
+
+.layout-row select {
+  flex: 1;
+  min-width: 120px;
+  margin: 0;
+}
+
+.layout-row input[type="number"] {
+  width: 2.5ch;
+  margin: 0;
+}
+
+.layout-input input[type="text"] {
+  width: 3ch;
+  min-width: 3ch;
+  max-width: 4ch;
+  padding: 0.25em;
+  text-align: center;
+}
+
+.field-error {
+  font-size: 0.75em;
+  color: #c00;
+  margin-top: 0.15em;
+}
+
+.layout-row button {
+  padding: 0.25em 0.5em;
+  margin: 0;
+}
+
+/* Dashboard zoom controls */
+.dashboard-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  flex-wrap: wrap;
+  border: 2px solid #222;
+  padding: 0.5em 1em;
+  margin: 0.5em 0 1em;
+  background: #fff;
+  font-weight: 600;
+}
+
+.dashboard-zoom-controls > span {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }

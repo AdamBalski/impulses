@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import ReactApexChart from 'react-apexcharts';
+import { getDisplayTypeMeta } from '../lib/displayTypes';
 
 function formatDurationMs(ms) {
   if (ms == null || Number.isNaN(ms)) return '';
@@ -33,6 +34,14 @@ function formatNumber(val) {
   return Number(val.toFixed(6)).toString();
 }
 
+function toCssSize(value, fallback) {
+  if (value == null) return fallback;
+  if (typeof value === 'number') {
+    return `${value}px`;
+  }
+  return value;
+}
+
 export default function Plot({
   data = {},
   variables = [],
@@ -41,6 +50,9 @@ export default function Plot({
   formatYAsDurationMs = false,
   xRange = null,
   yRanges = { left: null, right: null },
+  interpolateToLatest = false,
+  cutFutureDatapoints = false,
+  style = {},
 }) {
   const { hasLeftAxis, hasRightAxis, firstLeftName, firstRightName } = useMemo(() => {
     let firstLeft = null;
@@ -66,34 +78,82 @@ export default function Plot({
 
   const { series, hasData } = useMemo(() => {
     let hasData = false;
+    let globalMaxTimestamp = null;
+    const now = Date.now();
 
-    const series = variables.map(variable => {
+    const baseSeries = variables.map(variable => {
       const variableName = variable.variable;
-      const points = data[variableName] || [];
+      let points = data[variableName] || [];
+      if (cutFutureDatapoints) {
+        points = points.filter((point) => {
+          if (typeof point?.timestamp !== 'number') {
+            return false;
+          }
+          return point.timestamp <= now;
+        });
+      }
       if (points.length > 0) hasData = true;
 
-      const sorted = [...points].sort((a, b) => a.timestamp ?? 0 - b.timestamp ?? 0);
-      const displayType = variable.displayType || 'line';
-      const apexSeriesType =
-        displayType === 'dots' ? 'scatter' : displayType === 'bar' ? 'column' : 'line';
+      const sorted = [...points].sort(
+        (a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0),
+      );
+      const typeMeta = getDisplayTypeMeta(variable.displayType);
+      const apexSeriesType = typeMeta.apexType;
+
+      const mapped = sorted
+        .map(p => {
+          const x = p.timestamp;
+          if (typeof x === 'number') {
+            if (globalMaxTimestamp == null || x > globalMaxTimestamp) {
+              globalMaxTimestamp = x;
+            }
+          }
+          return x == null ? null : { x, y: p.value, dimensions: p.dimensions || {} };
+        })
+        .filter(Boolean);
 
       return {
         name: variableName,
-        data: sorted
-          .map(p => {
-            const x = p.timestamp;
-            return x == null ? null : { x, y: p.value, dimensions: p.dimensions || {} };
-          })
-          .filter(Boolean),
+        data: mapped,
         color: variable.color || '#0066cc',
         type: apexSeriesType,
       };
     });
 
+    const targetMaxTimestamp = interpolateToLatest
+      ? (typeof xRange?.max === 'number' ? xRange.max : globalMaxTimestamp)
+      : null;
+
+    const series = baseSeries.map((serie, idx) => {
+      if (
+        !interpolateToLatest ||
+        !serie.data.length ||
+        targetMaxTimestamp == null ||
+        serie.data[serie.data.length - 1].x >= targetMaxTimestamp
+      ) {
+        return serie;
+      }
+
+      const variable = variables[idx];
+      const meta = getDisplayTypeMeta(variable?.displayType);
+      if (!meta.interpolatable) {
+        return serie;
+      }
+
+      const lastPoint = serie.data[serie.data.length - 1];
+      const extendedData = [
+        ...serie.data,
+        { ...lastPoint, x: targetMaxTimestamp },
+      ];
+      return { ...serie, data: extendedData };
+    });
+
     return { series, hasData };
-  }, [data, variables]);
+  }, [data, variables, interpolateToLatest, cutFutureDatapoints, xRange]);
 
   const options = useMemo(() => {
+    const displayMetas = variables.map((variable) => getDisplayTypeMeta(variable.displayType));
+
     const yaxis = variables.map((variable) => ({
       seriesName: variable.useRightAxis ? firstRightName : firstLeftName,
       min: variable.useRightAxis
@@ -128,16 +188,14 @@ export default function Plot({
         animations: { enabled: false },
       },
       stroke: {
-        width: variables.map(i => {
-          if (i.displayType === 'dots' || i.displayType === 'bar') {
-            return 0;
-          }
-          return 2;
-        }),
+        width: displayMetas.map((meta) => meta.strokeWidth),
         curve: 'straight',
       },
       markers: {
-        size: variables.map(i => (i.displayType === 'dots' ? 4 : 0)),
+        size: displayMetas.map((meta) => meta.markerSize),
+        hover: {
+          sizeOffset: 2,
+        },
         strokeColors: 'transparent',
       },
       plotOptions: {
@@ -149,6 +207,9 @@ export default function Plot({
         borderColor: '#ddd',
       },
       tooltip: {
+        shared: false,
+        intersect: true,
+        followCursor: true,
         custom: ({ series, seriesIndex, dataPointIndex, w }) => {
           const s = w?.config?.series?.[seriesIndex];
           const point = s?.data?.[dataPointIndex];
@@ -202,17 +263,21 @@ export default function Plot({
     };
   }, [formatYAsDurationMs, variables, xRange, yRanges, firstLeftName, firstRightName]);
 
+  const computedWidth = toCssSize(width, '100%');
+  const computedHeight = toCssSize(height, '300px');
+  const containerStyle = { width: computedWidth, height: computedHeight, ...style };
+
   if (!hasData) {
     return (
-      <div className="chart-canvas chart-canvas--empty">
+      <div className="chart-canvas chart-canvas--empty" style={containerStyle}>
         <span className="chart-canvas__empty-text">No data available</span>
       </div>
     );
   }
 
   return (
-    <div className="chart-canvas">
-      <ReactApexChart options={options} series={series} type="line" width={width} height={height} />
+    <div className="chart-canvas" style={containerStyle}>
+      <ReactApexChart options={options} series={series} type="line" width="100%" height="100%" />
     </div>
   );
 }

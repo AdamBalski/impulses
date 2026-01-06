@@ -144,11 +144,26 @@ th {
   margin: 2em 0;
   padding: 1em 0;
   border-bottom: 2px solid #222;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75em;
+  align-items: center;
+}
+
+.nav-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75em;
+  flex: 1;
 }
 
 .nav a {
-  margin-right: 1em;
   font-weight: 600;
+}
+
+.nav-logout {
+  margin-left: auto;
+  white-space: nowrap;
 }
 
 .card {

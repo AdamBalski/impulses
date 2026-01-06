@@ -1,19 +1,29 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { compute, COMMON_LIBRARY } from '@impulses/sdk-typescript';
 import Plot from './Plot';
 import { getImpulsesClient } from '../lib/sdkClient';
+import { DISPLAY_TYPE_DEFAULT } from '../lib/displayTypes';
 
-export default function Chart({ chart, onUpdate, onDelete }) {
+export default function Chart({
+  chart,
+  onUpdate,
+  onDelete,
+  fillParent = false,
+  globalZoomCommand = null,
+  interpolateToLatestOverride = null,
+}) {
   const [data, setData] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [xRange, setXRange] = useState(null);
   const [yRanges, setYRanges] = useState({ left: null, right: null });
+  const lastZoomCommandIdRef = useRef(null);
 
   const variables = useMemo(() => {
     if (Array.isArray(chart.variables) && chart.variables.length > 0) {
       return chart.variables.map((variable) => ({
         ...variable,
+        displayType: variable.displayType || DISPLAY_TYPE_DEFAULT,
         useRightAxis: Boolean(variable.useRightAxis),
       }));
     }
@@ -21,7 +31,7 @@ export default function Chart({ chart, onUpdate, onDelete }) {
     return legacy.map((impulse, idx) => ({
       variable: impulse?.impulse_expression || `series_${idx + 1}`,
       color: impulse?.color || '#0066cc',
-      displayType: impulse?.displayType || 'line',
+      displayType: impulse?.displayType || DISPLAY_TYPE_DEFAULT,
       useRightAxis: false,
     }));
   }, [chart.variables, chart.impulses]);
@@ -129,23 +139,65 @@ export default function Chart({ chart, onUpdate, onDelete }) {
 
   function applyZoom(durationMs) {
     if (!timeBounds.max) {
-      return;
+      return false;
     }
-    const end = Date.now();
+    const end = timeBounds.max;
     const start = timeBounds.min != null ? Math.max(timeBounds.min, end - durationMs) : end - durationMs;
     setXRange({ min: start, max: end });
     setYRanges({
       left: getAxisBounds(start, end, 'left'),
       right: getAxisBounds(start, end, 'right'),
     });
+    return true;
   }
 
+  useEffect(() => {
+    if (!globalZoomCommand) {
+      return;
+    }
+    if (globalZoomCommand.id && globalZoomCommand.id === lastZoomCommandIdRef.current) {
+      return;
+    }
+    if (globalZoomCommand.type === 'preset') {
+      const applied = applyZoom(globalZoomCommand.durationMs);
+      if (applied) {
+        lastZoomCommandIdRef.current = globalZoomCommand.id;
+      }
+    } else if (globalZoomCommand.type === 'reset') {
+      setXRange(null);
+      setYRanges({ left: null, right: null });
+      lastZoomCommandIdRef.current = globalZoomCommand.id;
+    }
+  }, [globalZoomCommand, timeBounds]);
+
+  const shouldInterpolateToLatest =
+    typeof interpolateToLatestOverride === 'boolean'
+      ? interpolateToLatestOverride
+      : !!chart.interpolateToLatest;
+
+  const containerStyle = fillParent
+    ? {
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        margin: 0,
+      }
+    : undefined;
+
+  const plotWrapperStyle = fillParent
+    ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }
+    : undefined;
+
+  const plotStyle = fillParent ? { height: '100%' } : undefined;
+  const plotHeight = fillParent ? '100%' : 300;
+
   return (
-    <div className="chart-container">
+    <div className="chart-container" style={containerStyle}>
       <div className="chart-header">
-        <h3>{chart.name || 'Untitled Chart'}</h3>
+        <h4>{chart.name || 'Untitled Chart'}</h4>
         <div className="chart-actions">
-          <div style={{ display: 'flex', gap: '0.25rem', marginRight: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0', marginRight: '0' }}>
             {zoomPresets.map((preset) => (
               <button
                 key={preset.label}
@@ -158,25 +210,28 @@ export default function Chart({ chart, onUpdate, onDelete }) {
               </button>
             ))}
           </div>
-          <button onClick={loadData} disabled={loading}>
-            {loading ? 'Loading...' : 'Refresh'}
-          </button>
-          <button onClick={() => onDelete(chart.id)}>Delete</button>
         </div>
       </div>
 
       {error && <div className="error">{error}</div>}
 
-      <Plot
-        data={data}
-        variables={variables}
-        formatYAsDurationMs={!!chart.formatYAsDurationMs}
-        xRange={xRange}
-        yRanges={{
-          left: variables.some(v => !v.useRightAxis) ? yRanges.left : null,
-          right: variables.some(v => v.useRightAxis) ? yRanges.right : null,
-        }}
-      />
+      <div style={plotWrapperStyle}>
+        <Plot
+          data={data}
+          variables={variables}
+          width="100%"
+          height={plotHeight}
+          style={plotStyle}
+          formatYAsDurationMs={!!chart.formatYAsDurationMs}
+          xRange={xRange}
+          yRanges={{
+            left: variables.some(v => !v.useRightAxis) ? yRanges.left : null,
+            right: variables.some(v => v.useRightAxis) ? yRanges.right : null,
+          }}
+          interpolateToLatest={shouldInterpolateToLatest}
+          cutFutureDatapoints={!!chart.cutFutureDatapoints}
+        />
+      </div>
 
       <div className="chart-legend">
         {variables.map((variable, idx) => (

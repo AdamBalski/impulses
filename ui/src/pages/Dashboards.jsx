@@ -1,0 +1,159 @@
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import DashboardLayout from '../components/DashboardLayout';
+import DashboardPicker from '../components/DashboardPicker';
+import DashboardEditor from '../components/DashboardEditor';
+import DashboardZoomControls from '../components/DashboardZoomControls';
+import { loadChartsFromStorage } from '../lib/chartStorage';
+import {
+  loadDashboardsFromStorage,
+  saveDashboard,
+  deleteDashboard,
+  copyDashboard,
+  createDashboard,
+} from '../lib/dashboardStorage';
+
+export default function Dashboards() {
+  const { dashboardId } = useParams();
+  const navigate = useNavigate();
+
+  const [chartsMap, setChartsMap] = useState({});
+  const [dashboardsMap, setDashboardsMap] = useState({});
+  const [isEditing, setIsEditing] = useState(false);
+  const [globalZoomCommand, setGlobalZoomCommand] = useState(null);
+
+  useEffect(() => {
+    setChartsMap(loadChartsFromStorage());
+    setDashboardsMap(loadDashboardsFromStorage());
+  }, []);
+
+  const currentDashboard = dashboardId ? dashboardsMap[dashboardId] : null;
+
+  function handleGlobalPreset(preset) {
+    setGlobalZoomCommand({
+      id: `${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      type: 'preset',
+      durationMs: preset.durationMs,
+    });
+  }
+
+  function handleGlobalReset() {
+    setGlobalZoomCommand({
+      id: `${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      type: 'reset',
+    });
+  }
+
+  function handleNewDashboard() {
+    const newDashboard = createDashboard();
+    saveDashboard(newDashboard);
+    setDashboardsMap(loadDashboardsFromStorage());
+    navigate(`/dashboards/${newDashboard.id}`);
+    setIsEditing(true);
+  }
+
+  function handleToggleEdit() {
+    setIsEditing(!isEditing);
+  }
+
+  function handleSave(updatedDashboard) {
+    saveDashboard(updatedDashboard);
+    setDashboardsMap(loadDashboardsFromStorage());
+    setIsEditing(false);
+  }
+
+  function handleDelete(id) {
+    deleteDashboard(id);
+    setDashboardsMap(loadDashboardsFromStorage());
+    setIsEditing(false);
+    navigate('/dashboards');
+  }
+
+  function handleCopy(id) {
+    const copied = copyDashboard(id);
+    if (copied) {
+      setDashboardsMap(loadDashboardsFromStorage());
+      navigate(`/dashboards/${copied.id}`);
+      setIsEditing(true);
+    }
+  }
+
+  function handleCancelEdit() {
+    setIsEditing(false);
+  }
+
+  const hasDashboards = Object.keys(dashboardsMap).length > 0;
+
+  return (
+    <div>
+      <DashboardPicker
+        dashboards={dashboardsMap}
+        onNew={handleNewDashboard}
+        onEdit={handleToggleEdit}
+        isEditing={isEditing}
+      />
+
+      {dashboardId && (
+        <DashboardZoomControls onPreset={handleGlobalPreset} onReset={handleGlobalReset} />
+      )}
+
+      {isEditing && currentDashboard && (
+        <DashboardEditor
+          dashboard={currentDashboard}
+          chartsMap={chartsMap}
+          onSave={handleSave}
+          onDelete={handleDelete}
+          onCancel={handleCancelEdit}
+          onCopy={handleCopy}
+        />
+      )}
+
+      {!dashboardId && (
+        <div className="card" style={{ marginTop: '1em' }}>
+          <p>
+            {hasDashboards
+              ? 'Select a dashboard from the tabs above to view it.'
+              : 'No dashboards yet. Click "+ New" to create your first dashboard.'}
+          </p>
+        </div>
+      )}
+
+      {dashboardId && currentDashboard && !isEditing && (
+        <>
+          {(currentDashboard.layout?.length ?? 0) === 0 ? (
+            <div className="card" style={{ marginTop: '1em' }}>
+              <p>No charts configured for this dashboard yet.</p>
+              <p>Please click "Edit" above and add charts to the layout.</p>
+            </div>
+          ) : (
+            <div
+              style={{
+                width: '100vw',
+                maxWidth: '100vw',
+                display: 'flex',
+                justifyContent: 'center',
+                position: 'relative',
+                left: '50%',
+                right: '50%',
+                marginLeft: '-50vw',
+                marginRight: '-50vw',
+              }}
+            >
+              <DashboardLayout
+                layout={currentDashboard.layout || []}
+                chartsMap={chartsMap}
+                globalZoomCommand={globalZoomCommand}
+              />
+            </div>
+          )}
+        </>
+      )}
+
+      {dashboardId && !currentDashboard && (
+        <div className="card" style={{ marginTop: '1em' }}>
+          <p>Dashboard not found. It may have been deleted.</p>
+        </div>
+      )}
+    </div>
+  );
+}

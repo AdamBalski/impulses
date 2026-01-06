@@ -36,3 +36,16 @@ create table if not exists data_token (
 create index if not exists idx_app_user_email on app_user(email) where deleted_at is null;
 create index if not exists idx_data_token_user_id on data_token(user_id);
 create index if not exists idx_data_token_expires_at on data_token(expires_at);
+
+-- Local storage sync table
+create table if not exists local_storage_entry (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app_user(id),
+  key text not null,
+  value text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, key)
+);
+
+create index if not exists idx_local_storage_entry_user_id on local_storage_entry(user_id);

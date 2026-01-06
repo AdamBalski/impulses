@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { format as formatPulseProgram } from '@impulses/sdk-typescript';
 import Chart from '../components/Chart';
+import { DISPLAY_TYPE_OPTIONS, DISPLAY_TYPE_DEFAULT } from '../lib/displayTypes';
 
 const STORAGE_KEY = 'impulses_charts';
 const DEFAULT_COLOR = '#0066cc';
@@ -12,14 +13,15 @@ function generateId() {
 function loadChartsFromStorage() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
+    if (!stored) return {};
+    return JSON.parse(stored);
   } catch {
-    return [];
+    return {};
   }
 }
 
-function saveChartsToStorage(charts) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(charts));
+function saveChartsToStorage(chartsMap) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(chartsMap));
 }
 
 function ChartForm({
@@ -34,11 +36,17 @@ function ChartForm({
   formVariables,
   formFormatYAsDurationMs,
   setFormFormatYAsDurationMs,
+  formInterpolateToLatest,
+  setFormInterpolateToLatest,
+  formCutFutureDatapoints,
+  setFormCutFutureDatapoints,
   handleVariableChange,
   handleRemoveVariable,
   handleAddVariable,
   handleSubmit,
   onCancel,
+  onDelete,
+  editingChart,
 }) {
   const programTextareaRef = useRef(null);
 
@@ -118,6 +126,28 @@ function ChartForm({
           Render Y values as durations (ms)
         </label>
 
+        <br />
+
+        <label style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-start', gap: '6px', whiteSpace: 'nowrap' }}>
+          <input
+            type="checkbox"
+            checked={formInterpolateToLatest}
+            onChange={e => setFormInterpolateToLatest(e.target.checked)}
+          />
+          Extend line series to latest timestamp
+        </label>
+
+        <br />
+
+        <label style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-start', gap: '6px', whiteSpace: 'nowrap' }}>
+          <input
+            type="checkbox"
+            checked={formCutFutureDatapoints}
+            onChange={e => setFormCutFutureDatapoints(e.target.checked)}
+          />
+          Hide datapoints after now
+        </label>
+
         <div className="impulses-section">
           <h4>Variables</h4>
           {formVariables.map((variable, idx) => (
@@ -130,12 +160,14 @@ function ChartForm({
                 required
               />
               <select
-                value={variable.displayType || 'line'}
+                value={variable.displayType || DISPLAY_TYPE_DEFAULT}
                 onChange={e => handleVariableChange(idx, 'displayType', e.target.value)}
               >
-                <option value="line">Line</option>
-                <option value="dots">Dots</option>
-                <option value="bar">Bars</option>
+                {DISPLAY_TYPE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option.charAt(0).toUpperCase() + option.slice(1)}
+                  </option>
+                ))}
               </select>
               <input
                 type="color"
@@ -159,6 +191,19 @@ function ChartForm({
         <div className="button-group">
           <button type="submit">{submitLabel}</button>
           <button type="button" onClick={onCancel}>Cancel</button>
+          {editingChart && (
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm(`Delete chart "${editingChart.name}"? This cannot be undone.`)) {
+                  onDelete(editingChart.id);
+                  onCancel();
+                }
+              }}
+            >
+              Delete Chart
+            </button>
+          )}
         </div>
       </form>
     </div>
@@ -166,15 +211,19 @@ function ChartForm({
 }
 
 export default function Charts() {
-  const [charts, setCharts] = useState(loadChartsFromStorage);
+  const [chartsMap, setChartsMap] = useState(loadChartsFromStorage);
   const [showForm, setShowForm] = useState(false);
   const [editingChart, setEditingChart] = useState(null);
+
+  const charts = Object.values(chartsMap);
 
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formProgram, setFormProgram] = useState('');
   const [formVariables, setFormVariables] = useState([]);
   const [formFormatYAsDurationMs, setFormFormatYAsDurationMs] = useState(false);
+  const [formInterpolateToLatest, setFormInterpolateToLatest] = useState(false);
+  const [formCutFutureDatapoints, setFormCutFutureDatapoints] = useState(false);
 
   const isInitialMount = useRef(true);
 
@@ -183,8 +232,8 @@ export default function Charts() {
       isInitialMount.current = false;
       return;
     }
-    saveChartsToStorage(charts);
-  }, [charts]);
+    saveChartsToStorage(chartsMap);
+  }, [chartsMap]);
 
   function resetForm() {
     setFormName('');
@@ -192,6 +241,8 @@ export default function Charts() {
     setFormProgram('');
     setFormVariables([]);
     setFormFormatYAsDurationMs(false);
+    setFormInterpolateToLatest(false);
+    setFormCutFutureDatapoints(false);
     setEditingChart(null);
     setShowForm(false);
   }
@@ -210,6 +261,8 @@ export default function Charts() {
       useRightAxis: !!variable.useRightAxis,
     })));
     setFormFormatYAsDurationMs(!!chart.formatYAsDurationMs);
+    setFormInterpolateToLatest(!!chart.interpolateToLatest);
+    setFormCutFutureDatapoints(!!chart.cutFutureDatapoints);
     setEditingChart(chart);
     setShowForm(true);
   }
@@ -217,7 +270,7 @@ export default function Charts() {
   function handleAddVariable() {
     setFormVariables([
       ...formVariables,
-      { variable: '', color: DEFAULT_COLOR, displayType: 'line', useRightAxis: false },
+      { variable: '', color: DEFAULT_COLOR, displayType: DISPLAY_TYPE_DEFAULT, useRightAxis: false },
     ]);
   }
 
@@ -229,6 +282,13 @@ export default function Charts() {
     const updated = [...formVariables];
     updated[index] = { ...updated[index], [field]: value };
     setFormVariables(updated);
+  }
+
+  function upsertChart(chartData) {
+    setChartsMap(prev => ({
+      ...prev,
+      [chartData.id]: chartData,
+    }));
   }
 
   function handleSubmit(e) {
@@ -246,27 +306,29 @@ export default function Charts() {
           useRightAxis: !!v.useRightAxis,
         })),
       formatYAsDurationMs: !!formFormatYAsDurationMs,
+      interpolateToLatest: !!formInterpolateToLatest,
+      cutFutureDatapoints: !!formCutFutureDatapoints,
       createdAt: editingChart?.createdAt || Date.now(),
       updatedAt: Date.now(),
     };
 
-    if (editingChart) {
-      setCharts(charts.map(c => c.id === editingChart.id ? chartData : c));
-    } else {
-      setCharts([...charts, chartData]);
-    }
+    upsertChart(chartData);
 
     resetForm();
   }
 
   function handleDelete(chartId) {
     if (confirm('Delete this chart?')) {
-      setCharts(charts.filter(c => c.id !== chartId));
+      setChartsMap(prev => {
+        const next = { ...prev };
+        delete next[chartId];
+        return next;
+      });
     }
   }
 
   function handleUpdate(updatedChart) {
-    setCharts(charts.map(c => c.id === updatedChart.id ? updatedChart : c));
+    upsertChart(updatedChart);
   }
 
   return (
@@ -290,11 +352,17 @@ export default function Charts() {
           formVariables={formVariables}
           formFormatYAsDurationMs={formFormatYAsDurationMs}
           setFormFormatYAsDurationMs={setFormFormatYAsDurationMs}
+          formInterpolateToLatest={formInterpolateToLatest}
+          setFormInterpolateToLatest={setFormInterpolateToLatest}
+          formCutFutureDatapoints={formCutFutureDatapoints}
+          setFormCutFutureDatapoints={setFormCutFutureDatapoints}
           handleVariableChange={handleVariableChange}
           handleRemoveVariable={handleRemoveVariable}
           handleAddVariable={handleAddVariable}
           handleSubmit={handleSubmit}
           onCancel={resetForm}
+          onDelete={handleDelete}
+          editingChart={null}
         />
       )}
 
@@ -317,11 +385,17 @@ export default function Charts() {
               formVariables={formVariables}
               formFormatYAsDurationMs={formFormatYAsDurationMs}
               setFormFormatYAsDurationMs={setFormFormatYAsDurationMs}
+              formInterpolateToLatest={formInterpolateToLatest}
+              setFormInterpolateToLatest={setFormInterpolateToLatest}
+              formCutFutureDatapoints={formCutFutureDatapoints}
+              setFormCutFutureDatapoints={setFormCutFutureDatapoints}
               handleVariableChange={handleVariableChange}
               handleRemoveVariable={handleRemoveVariable}
               handleAddVariable={handleAddVariable}
               handleSubmit={handleSubmit}
               onCancel={resetForm}
+              onDelete={handleDelete}
+              editingChart={editingChart}
             />
           )}
           <Chart

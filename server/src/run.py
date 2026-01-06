@@ -22,6 +22,8 @@ from src.resources import data
 from src.resources import google_oauth2
 from src.resources import user
 from src.resources import token
+from src.resources import local_storage
+from src.dao import local_storage_repo
 from src.job import job
 from src.job import heartbeat_job
 from src.job.gcal_sync import gcal_polling_job
@@ -89,6 +91,7 @@ def main():
         .provide_obj(pg_pool) \
         .provide_obj(user_repo.UserRepo(pg_pool)) \
         .provide_obj(token_repository) \
+        .provide_obj(local_storage_repo.LocalStorageRepo(pg_pool)) \
         .provide_obj(session_store) \
         .provide_obj(token_cache) \
         .provide_obj(gcal_dao) \
@@ -117,6 +120,7 @@ def main():
     app.include_router(data.router, prefix="/data")
     app.include_router(user.router, prefix="/user")
     app.include_router(token.router, prefix="/token")
+    app.include_router(local_storage.router, prefix="/local-storage")
 
 
     @app.get("/healthz")

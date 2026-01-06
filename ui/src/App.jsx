@@ -8,6 +8,8 @@ import MetricDetail from './pages/MetricDetail';
 import Tokens from './pages/Tokens';
 import GCalIntegration from './pages/GCalIntegration';
 import Charts from './pages/Charts';
+import Dashboards from './pages/Dashboards';
+import LocalStorageSync from './pages/LocalStorageSync';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -44,12 +46,16 @@ function Navigation() {
   
   return (
     <nav className="nav">
-      <Link to="/dashboard">Dashboard</Link>
-      <Link to="/metrics">Metrics</Link>
-      <Link to="/tokens">Tokens</Link>
-      <Link to="/gcal">GCal integration</Link>
-      <Link to="/charts">Charts</Link>
-      <button onClick={logout} style={{ float: 'right', marginTop: '-5px' }}>Logout</button>
+      <div className="nav-links">
+        <Link to="/dashboard">Dashboard</Link>
+        <Link to="/metrics">Metrics</Link>
+        <Link to="/tokens">Tokens</Link>
+        <Link to="/gcal">GCal integration</Link>
+        <Link to="/dashboards">Dashboards</Link>
+        <Link to="/charts">Charts</Link>
+        <Link to="/storage-sync">Storage Sync</Link>
+      </div>
+      <button className="nav-logout" onClick={logout}>Logout</button>
     </nav>
   );
 }
@@ -103,8 +109,24 @@ function AppContent() {
             <Charts />
           </ProtectedRoute>
         } />
+        <Route path="/dashboards" element={
+          <ProtectedRoute>
+            <Dashboards />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboards/:dashboardId" element={
+          <ProtectedRoute>
+            <Dashboards />
+          </ProtectedRoute>
+        } />
+        <Route path="/storage-sync" element={
+          <ProtectedRoute>
+            <LocalStorageSync />
+          </ProtectedRoute>
+        } />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Routes>
+      <div style={{ height: '30px' }}></div>
     </>
   );
 }
