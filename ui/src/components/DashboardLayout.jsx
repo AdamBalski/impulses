@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Chart from './Chart';
 
 const TOTAL_BLOCKS = 60;
@@ -40,7 +40,9 @@ function useBlockSize() {
   return { blockPx, blocksPerRow };
 }
 
-export default function DashboardLayout({ layout, chartsMap, globalZoomCommand = null }) {
+const NOOP = () => {};
+
+export default function DashboardLayout({ layout, chartsMap, globalZoomCommand = null, dashboardSeriesData = null, dashboardDefaultZoomWindow = null, dashboardOverrideChartZoom = false }) {
   const { blockPx, blocksPerRow } = useBlockSize();
 
   const rows = useMemo(() => {
@@ -67,7 +69,19 @@ export default function DashboardLayout({ layout, chartsMap, globalZoomCommand =
       result.push(currentRow);
     }
 
-    return result;
+    return result.map(
+        row => {
+            // expand last chart to fill remaining space
+            const currWidth = row.reduce((sum, item) => sum + item.effectiveWidth, 0);
+            row[row.length - 1].effectiveWidth += blocksPerRow - currWidth;
+
+            // align all items in a row to max height in that row
+            const maxHeight = row.reduce((max, item) => Math.max(max, item.height), 0);
+            row.forEach(item => item.height = maxHeight);
+
+            return row;
+        }
+    );
   }, [layout, blocksPerRow]);
 
   const totalWidthPx = blocksPerRow * blockPx;
@@ -75,21 +89,10 @@ export default function DashboardLayout({ layout, chartsMap, globalZoomCommand =
   return (
     <div
       className="dashboard-layout"
-      style={{
-        width: totalWidthPx,
-        maxWidth: '100%',
-        margin: '0 auto',
-      }}
+      style={{ width: totalWidthPx }}
     >
       {rows.map((row, rowIdx) => (
-        <div
-          key={rowIdx}
-          className="dashboard-row"
-          style={{
-            display: 'flex',
-            flexWrap: 'nowrap',
-          }}
-        >
+        <div key={rowIdx} className="dashboard-row">
           {row.map((item, itemIdx) => {
             const widthPx = item.effectiveWidth * blockPx;
             const heightPx = item.height * BLOCK_HEIGHT_PX;
@@ -99,18 +102,13 @@ export default function DashboardLayout({ layout, chartsMap, globalZoomCommand =
               <div
                 key={item.chartId || itemIdx}
                 className="dashboard-cell"
-                style={{
-                  width: widthPx,
-                  height: heightPx,
-                  boxSizing: 'border-box',
-                  overflow: 'hidden',
-                }}
+                style={{ width: widthPx, height: heightPx }}
               >
                 {chart ? (
                   <Chart
                     chart={chart}
-                    onUpdate={() => {}}
-                    onDelete={() => {}}
+                    onUpdate={NOOP}
+                    onDelete={NOOP}
                     fillParent
                     globalZoomCommand={globalZoomCommand}
                     interpolateToLatestOverride={
@@ -118,19 +116,12 @@ export default function DashboardLayout({ layout, chartsMap, globalZoomCommand =
                         ? item.interpolateToLatest
                         : undefined
                     }
+                    dashboardSeriesData={dashboardSeriesData}
+                    dashboardDefaultZoomWindow={dashboardDefaultZoomWindow}
+                    dashboardOverrideChartZoom={dashboardOverrideChartZoom}
                   />
                 ) : (
-                  <div
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background: '#f5f5f5',
-                      border: '1px dashed #ccc',
-                    }}
-                  >
+                  <div className="dashboard-cell-placeholder">
                     Chart not found: {item.chartId}
                   </div>
                 )}

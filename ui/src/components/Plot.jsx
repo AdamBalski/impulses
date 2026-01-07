@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import ReactApexChart from 'react-apexcharts';
 import { getDisplayTypeMeta } from '../lib/displayTypes';
+import { useUserSettings } from '../contexts/UserSettingsContext';
 
 function formatDurationMs(ms) {
   if (ms == null || Number.isNaN(ms)) return '';
@@ -23,7 +24,10 @@ function formatDurationMs(ms) {
   return sign + parts.join(' ');
 }
 
-function formatNumber(val) {
+function formatNumber(val, hideSensitiveData = false) {
+  if (hideSensitiveData) {
+    return 'Sensitive data';
+  }
   if (val == null || Number.isNaN(val)) {
     return '';
   }
@@ -42,6 +46,72 @@ function toCssSize(value, fallback) {
   return value;
 }
 
+const RESOLUTION_DURATIONS = {
+  raw: null,
+  day: 24 * 60 * 60 * 1000,
+  week: 7 * 24 * 60 * 60 * 1000,
+  two_weeks: 14 * 24 * 60 * 60 * 1000,
+  month: 30 * 24 * 60 * 60 * 1000,
+};
+
+function applyResolutionAndRollUp(points, resolution, rollUp) {
+  const bucketMs = RESOLUTION_DURATIONS[resolution];
+  if (!bucketMs || points.length === 0) {
+    return points;
+  }
+
+  const buckets = new Map();
+  for (const point of points) {
+    const ts = point.timestamp;
+    if (typeof ts !== 'number') continue;
+    const bucketKey = Math.floor(ts / bucketMs);
+    if (!buckets.has(bucketKey)) {
+      buckets.set(bucketKey, []);
+    }
+    buckets.get(bucketKey).push(point);
+  }
+
+  const result = [];
+  for (const [bucketKey, bucketPoints] of buckets) {
+    if (bucketPoints.length === 0) continue;
+
+    const sorted = bucketPoints.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+    let aggregatedValue;
+    let representativePoint;
+
+    switch (rollUp) {
+      case 'sum':
+        aggregatedValue = sorted.reduce((sum, p) => sum + (p.value ?? 0), 0);
+        representativePoint = sorted[sorted.length - 1];
+        break;
+      case 'average':
+        aggregatedValue = sorted.reduce((sum, p) => sum + (p.value ?? 0), 0) / sorted.length;
+        representativePoint = sorted[sorted.length - 1];
+        break;
+      case 'min':
+        aggregatedValue = Math.min(...sorted.map(p => p.value ?? Infinity));
+        representativePoint = sorted.find(p => p.value === aggregatedValue) || sorted[0];
+        break;
+      case 'max':
+        aggregatedValue = Math.max(...sorted.map(p => p.value ?? -Infinity));
+        representativePoint = sorted.find(p => p.value === aggregatedValue) || sorted[0];
+        break;
+      case 'last':
+      default:
+        representativePoint = sorted[sorted.length - 1];
+        aggregatedValue = representativePoint.value;
+        break;
+    }
+
+    result.push({
+      ...representativePoint,
+      value: aggregatedValue,
+    });
+  }
+
+  return result.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+}
+
 export default function Plot({
   data = {},
   variables = [],
@@ -50,19 +120,19 @@ export default function Plot({
   formatYAsDurationMs = false,
   xRange = null,
   yRanges = { left: null, right: null },
-  interpolateToLatest = false,
-  cutFutureDatapoints = false,
-  style = {},
+  className = '',
 }) {
+  const { hideSensitiveData } = useUserSettings();
   const { hasLeftAxis, hasRightAxis, firstLeftName, firstRightName } = useMemo(() => {
     let firstLeft = null;
     let firstRight = null;
     for (const variable of variables) {
+      const displayName = variable.alias?.trim() || variable.variable;
       if (!variable.useRightAxis && !firstLeft) {
-        firstLeft = variable.variable;
+        firstLeft = displayName;
       }
       if (variable.useRightAxis && !firstRight) {
-        firstRight = variable.variable;
+        firstRight = displayName;
       }
       if (firstLeft && firstRight) {
         break;
@@ -78,20 +148,18 @@ export default function Plot({
 
   const { series, hasData } = useMemo(() => {
     let hasData = false;
-    let globalMaxTimestamp = null;
-    const now = Date.now();
 
-    const baseSeries = variables.map(variable => {
+    const series = variables.map(variable => {
       const variableName = variable.variable;
+      const displayName = variable.alias?.trim() || variableName;
       let points = data[variableName] || [];
-      if (cutFutureDatapoints) {
-        points = points.filter((point) => {
-          if (typeof point?.timestamp !== 'number') {
-            return false;
-          }
-          return point.timestamp <= now;
-        });
+
+      const resolution = variable.resolution || 'raw';
+      const rollUp = variable.rollUp || 'last';
+      if (resolution !== 'raw') {
+        points = applyResolutionAndRollUp(points, resolution, rollUp);
       }
+
       if (points.length > 0) hasData = true;
 
       const sorted = [...points].sort(
@@ -103,53 +171,30 @@ export default function Plot({
       const mapped = sorted
         .map(p => {
           const x = p.timestamp;
-          if (typeof x === 'number') {
-            if (globalMaxTimestamp == null || x > globalMaxTimestamp) {
-              globalMaxTimestamp = x;
-            }
-          }
           return x == null ? null : { x, y: p.value, dimensions: p.dimensions || {} };
         })
         .filter(Boolean);
 
       return {
-        name: variableName,
+        name: displayName,
         data: mapped,
         color: variable.color || '#0066cc',
         type: apexSeriesType,
       };
     });
 
-    const targetMaxTimestamp = interpolateToLatest
-      ? (typeof xRange?.max === 'number' ? xRange.max : globalMaxTimestamp)
-      : null;
-
-    const series = baseSeries.map((serie, idx) => {
-      if (
-        !interpolateToLatest ||
-        !serie.data.length ||
-        targetMaxTimestamp == null ||
-        serie.data[serie.data.length - 1].x >= targetMaxTimestamp
-      ) {
-        return serie;
-      }
-
-      const variable = variables[idx];
-      const meta = getDisplayTypeMeta(variable?.displayType);
-      if (!meta.interpolatable) {
-        return serie;
-      }
-
-      const lastPoint = serie.data[serie.data.length - 1];
-      const extendedData = [
-        ...serie.data,
-        { ...lastPoint, x: targetMaxTimestamp },
-      ];
-      return { ...serie, data: extendedData };
-    });
-
     return { series, hasData };
-  }, [data, variables, interpolateToLatest, cutFutureDatapoints, xRange]);
+  }, [data, variables]);
+
+  const valueFormatter = useMemo(() => {
+    if (hideSensitiveData) {
+      return () => ':|';
+    }
+    if (formatYAsDurationMs) {
+      return (val) => formatDurationMs(val);
+    }
+    return (val) => formatNumber(val, false);
+  }, [hideSensitiveData, formatYAsDurationMs]);
 
   const options = useMemo(() => {
     const displayMetas = variables.map((variable) => getDisplayTypeMeta(variable.displayType));
@@ -165,7 +210,7 @@ export default function Plot({
       opposite: !!variable.useRightAxis,
       labels: {
         style: { fontSize: '10px' },
-        formatter: formatYAsDurationMs ? (val) => formatDurationMs(val) : (val) => formatNumber(val),
+        formatter: valueFormatter,
       },
       tickAmount: 8,
     }));
@@ -175,7 +220,7 @@ export default function Plot({
         seriesName: undefined,
         labels: {
           style: { fontSize: '10px' },
-          formatter: formatYAsDurationMs ? (val) => formatDurationMs(val) : (val) => formatNumber(val),
+          formatter: valueFormatter,
         },
         tickAmount: 8,
       });
@@ -218,7 +263,7 @@ export default function Plot({
           const dims = point?.dimensions || {};
 
           const xText = x == null ? 'N/A' : new Date(x).toLocaleString();
-          const yText = y == null ? 'N/A' : (formatYAsDurationMs ? formatDurationMs(y) : formatNumber(y));
+          const yText = y == null ? 'N/A' : valueFormatter(y);
 
           const dimKeys = Object.keys(dims);
           const dimsHtml = dimKeys.length
@@ -261,22 +306,28 @@ export default function Plot({
       legend: { show: false },
       colors: variables.map(i => i.color || '#0066cc'),
     };
-  }, [formatYAsDurationMs, variables, xRange, yRanges, firstLeftName, firstRightName]);
+  }, [formatYAsDurationMs, variables, xRange, yRanges, firstLeftName, firstRightName, valueFormatter]);
 
   const computedWidth = toCssSize(width, '100%');
   const computedHeight = toCssSize(height, '300px');
-  const containerStyle = { width: computedWidth, height: computedHeight, ...style };
+  const containerStyle = { width: computedWidth, height: computedHeight };
+  const containerClass = className
+    ? `chart-canvas ${className}`
+    : 'chart-canvas';
+  const emptyContainerClass = className
+    ? `chart-canvas chart-canvas--empty ${className}`
+    : 'chart-canvas chart-canvas--empty';
 
   if (!hasData) {
     return (
-      <div className="chart-canvas chart-canvas--empty" style={containerStyle}>
+      <div className={emptyContainerClass} style={containerStyle}>
         <span className="chart-canvas__empty-text">No data available</span>
       </div>
     );
   }
 
   return (
-    <div className="chart-canvas" style={containerStyle}>
+    <div className={containerClass} style={containerStyle}>
       <ReactApexChart options={options} series={series} type="line" width="100%" height="100%" />
     </div>
   );

@@ -1,8 +1,125 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { compute, COMMON_LIBRARY } from '@impulses/sdk-typescript';
 import Plot from './Plot';
 import { getImpulsesClient } from '../lib/sdkClient';
-import { DISPLAY_TYPE_DEFAULT } from '../lib/displayTypes';
+import { DISPLAY_TYPE_DEFAULT, getDisplayTypeMeta } from '../lib/displayTypes';
+
+function processSeriesData(rawData, variablesList, shouldCutFuture, shouldInterpolateToLatest) {
+  const now = Date.now();
+  let globalMaxTs = null;
+
+  const processed = {};
+  for (const variable of variablesList) {
+    const name = variable.variable?.trim();
+    if (!name) continue;
+    let points = rawData[name] ?? [];
+
+    if (shouldCutFuture) {
+      points = points.filter(p => typeof p?.timestamp === 'number' && p.timestamp <= now);
+    }
+
+    for (const p of points) {
+      if (typeof p?.timestamp === 'number') {
+        if (globalMaxTs == null || p.timestamp > globalMaxTs) {
+          globalMaxTs = p.timestamp;
+        }
+      }
+    }
+
+    processed[name] = points;
+  }
+
+  if (shouldInterpolateToLatest && globalMaxTs != null) {
+    for (const variable of variablesList) {
+      const name = variable.variable?.trim();
+      if (!name) continue;
+      const meta = getDisplayTypeMeta(variable.displayType);
+      if (!meta.interpolatable) continue;
+
+      const points = processed[name];
+      if (!points || points.length === 0) continue;
+
+      const sorted = [...points].sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+      const lastPoint = sorted[sorted.length - 1];
+      if (lastPoint && lastPoint.timestamp < globalMaxTs) {
+        processed[name] = [...sorted, { ...lastPoint, timestamp: globalMaxTs }];
+      }
+    }
+  }
+
+  return processed;
+}
+
+const ZOOM_PRESETS = [
+  { label: 'Y', durationMs: 365 * 24 * 60 * 60 * 1000 },
+  { label: '6M', durationMs: 183 * 24 * 60 * 60 * 1000 },
+  { label: '3M', durationMs: 92 * 24 * 60 * 60 * 1000 },
+  { label: 'M', durationMs: 31 * 24 * 60 * 60 * 1000 },
+  { label: 'W', durationMs: 7 * 24 * 60 * 60 * 1000 },
+];
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function parseDuration(duration) {
+  const regex = /(-?\d+)(d|h|min|ms|m|s)/g;
+  let match;
+  let total = 0;
+  while ((match = regex.exec(duration)) !== null) {
+    const amount = parseInt(match[1], 10);
+    const unit = match[2];
+    switch (unit) {
+      case 'd':
+        total += amount * DAY_MS;
+        break;
+      case 'h':
+        total += amount * 60 * 60 * 1000;
+        break;
+      case 'min':
+      case 'm':
+        total += amount * 60 * 1000;
+        break;
+      case 's':
+        total += amount * 1000;
+        break;
+      case 'ms':
+        total += amount;
+        break;
+      default:
+        break;
+    }
+  }
+  return total;
+}
+
+function parseCustomWindow(input) {
+  if (!input || !input.trim()) return null;
+  const trimmed = input.trim();
+  const now = Date.now();
+
+  if (trimmed.includes(':')) {
+    const [fromPart, toPart] = trimmed.split(':');
+    const fromMs = parseDuration(fromPart.trim());
+    const toMs = parseDuration(toPart.trim());
+    return {
+      start: now + fromMs,
+      end: now + toMs,
+    };
+  }
+
+  const durationMs = parseDuration(trimmed);
+  if (durationMs < 0) {
+    return {
+      start: now + durationMs,
+      end: now,
+    };
+  } else if (durationMs > 0) {
+    return {
+      start: now,
+      end: now + durationMs,
+    };
+  }
+  return null;
+}
 
 export default function Chart({
   chart,
@@ -11,6 +128,9 @@ export default function Chart({
   fillParent = false,
   globalZoomCommand = null,
   interpolateToLatestOverride = null,
+  dashboardSeriesData = null,
+  dashboardDefaultZoomWindow = null,
+  dashboardOverrideChartZoom = false,
 }) {
   const [data, setData] = useState({});
   const [loading, setLoading] = useState(false);
@@ -18,36 +138,78 @@ export default function Chart({
   const [xRange, setXRange] = useState(null);
   const [yRanges, setYRanges] = useState({ left: null, right: null });
   const lastZoomCommandIdRef = useRef(null);
+  const [customZoomInput, setCustomZoomInput] = useState('');
+  const hasAppliedDefaultZoomRef = useRef(false);
+
+  const shouldInterpolateToLatest =
+    typeof interpolateToLatestOverride === 'boolean'
+      ? interpolateToLatestOverride
+      : !!chart.interpolateToLatest;
+
+  const shouldCutFuture = !!chart.cutFutureDatapoints;
 
   const variables = useMemo(() => {
+    let vars;
     if (Array.isArray(chart.variables) && chart.variables.length > 0) {
-      return chart.variables.map((variable) => ({
+      vars = chart.variables.map((variable) => ({
         ...variable,
         displayType: variable.displayType || DISPLAY_TYPE_DEFAULT,
         useRightAxis: Boolean(variable.useRightAxis),
       }));
+    } else {
+      const legacy = Array.isArray(chart.impulses) ? chart.impulses : [];
+      vars = legacy.map((impulse, idx) => ({
+        variable: impulse?.impulse_expression || `series_${idx + 1}`,
+        color: impulse?.color || '#0066cc',
+        displayType: impulse?.displayType || DISPLAY_TYPE_DEFAULT,
+        useRightAxis: false,
+      }));
     }
-    const legacy = Array.isArray(chart.impulses) ? chart.impulses : [];
-    return legacy.map((impulse, idx) => ({
-      variable: impulse?.impulse_expression || `series_${idx + 1}`,
-      color: impulse?.color || '#0066cc',
-      displayType: impulse?.displayType || DISPLAY_TYPE_DEFAULT,
-      useRightAxis: false,
-    }));
-  }, [chart.variables, chart.impulses]);
+
+    return {
+      list: vars,
+      shouldInterpolateToLatest,
+      shouldCutFuture,
+    };
+  }, [chart.variables, chart.impulses, shouldInterpolateToLatest, shouldCutFuture]);
+
+  const useDashboardData = dashboardSeriesData !== null;
 
   useEffect(() => {
-    if (chart.program && variables.length > 0) {
+    if (useDashboardData) {
+      const rawData = {};
+      for (const variable of variables.list) {
+        const name = variable.variable?.trim();
+        if (!name) continue;
+        rawData[name] = dashboardSeriesData[name] || [];
+      }
+      const processed = processSeriesData(
+        rawData,
+        variables.list,
+        variables.shouldCutFuture,
+        variables.shouldInterpolateToLatest,
+      );
+      setData(processed);
+      setXRange(null);
+      setYRanges({ left: null, right: null });
+      setError('');
+      return;
+    }
+
+    if (chart.program && variables.list.length > 0) {
       loadData();
     }
-  }, [chart.program, chart.updatedAt, variables.length]);
+  }, [chart.program, chart.updatedAt, variables, useDashboardData, dashboardSeriesData]);
 
   async function loadData() {
+    if (useDashboardData) {
+      return;
+    }
     if (!chart.program) {
       setError('Missing PulseLang program');
       return;
     }
-    if (variables.length === 0) {
+    if (variables.list.length === 0) {
       setError('Add at least one variable to render a chart');
       return;
     }
@@ -60,7 +222,7 @@ export default function Chart({
       const resultMap = await compute(client, COMMON_LIBRARY, chart.program);
       const nextData = {};
 
-      for (const variable of variables) {
+      for (const variable of variables.list) {
         const name = variable.variable?.trim();
         if (!name) {
           nextData[name || ''] = [];
@@ -75,7 +237,13 @@ export default function Chart({
         }
       }
 
-      setData(nextData);
+      const processed = processSeriesData(
+        nextData,
+        variables.list,
+        variables.shouldCutFuture,
+        variables.shouldInterpolateToLatest,
+      );
+      setData(processed);
       setXRange(null);
       setYRanges({ left: null, right: null });
     } catch (err) {
@@ -98,18 +266,10 @@ export default function Chart({
     return { min: timestamps[0], max: timestamps[timestamps.length - 1] };
   }, [data]);
 
-  const zoomPresets = [
-    { label: 'Y', durationMs: 365 * 24 * 60 * 60 * 1000 },
-    { label: '6M', durationMs: 183 * 24 * 60 * 60 * 1000 },
-    { label: '3M', durationMs: 92 * 24 * 60 * 60 * 1000 },
-    { label: 'M', durationMs: 31 * 24 * 60 * 60 * 1000 },
-    { label: 'W', durationMs: 7 * 24 * 60 * 60 * 1000 },
-  ];
-
-  function getAxisBounds(start, end, axis) {
+  const getAxisBounds = useCallback((start, end, axis) => {
     let min = Infinity;
     let max = -Infinity;
-    for (const variable of variables) {
+    for (const variable of variables.list) {
       const targetAxis = variable.useRightAxis ? 'right' : 'left';
       if (targetAxis !== axis) {
         continue;
@@ -135,9 +295,9 @@ export default function Chart({
       return { min: min - pad, max: max + pad };
     }
     return { min, max };
-  }
+  }, [variables.list, data]);
 
-  function applyZoom(durationMs) {
+  const applyZoom = useCallback((durationMs) => {
     if (!timeBounds.max) {
       return false;
     }
@@ -149,7 +309,24 @@ export default function Chart({
       right: getAxisBounds(start, end, 'right'),
     });
     return true;
-  }
+  }, [timeBounds, getAxisBounds]);
+
+  const applyCustomZoom = useCallback((inputValue) => {
+    const window = parseCustomWindow(inputValue);
+    if (!window) return false;
+    setXRange({ min: window.start, max: window.end });
+    setYRanges({
+      left: getAxisBounds(window.start, window.end, 'left'),
+      right: getAxisBounds(window.start, window.end, 'right'),
+    });
+    return true;
+  }, [getAxisBounds]);
+
+  const handleCustomZoomKeyDown = useCallback((e) => {
+    if (e.key === 'Enter') {
+      applyCustomZoom(customZoomInput);
+    }
+  }, [applyCustomZoom, customZoomInput]);
 
   useEffect(() => {
     if (!globalZoomCommand) {
@@ -163,82 +340,104 @@ export default function Chart({
       if (applied) {
         lastZoomCommandIdRef.current = globalZoomCommand.id;
       }
+    } else if (globalZoomCommand.type === 'custom') {
+      setXRange({ min: globalZoomCommand.start, max: globalZoomCommand.end });
+      setYRanges({
+        left: getAxisBounds(globalZoomCommand.start, globalZoomCommand.end, 'left'),
+        right: getAxisBounds(globalZoomCommand.start, globalZoomCommand.end, 'right'),
+      });
+      lastZoomCommandIdRef.current = globalZoomCommand.id;
     } else if (globalZoomCommand.type === 'reset') {
       setXRange(null);
       setYRanges({ left: null, right: null });
       lastZoomCommandIdRef.current = globalZoomCommand.id;
     }
-  }, [globalZoomCommand, timeBounds]);
+  }, [globalZoomCommand, timeBounds, applyZoom, getAxisBounds]);
 
-  const shouldInterpolateToLatest =
-    typeof interpolateToLatestOverride === 'boolean'
-      ? interpolateToLatestOverride
-      : !!chart.interpolateToLatest;
+  useEffect(() => {
+    if (hasAppliedDefaultZoomRef.current) return;
+    if (!timeBounds.max) return;
 
-  const containerStyle = fillParent
-    ? {
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: 0,
-        margin: 0,
+    let effectiveZoomWindow = null;
+    if (dashboardDefaultZoomWindow && dashboardOverrideChartZoom) {
+      effectiveZoomWindow = dashboardDefaultZoomWindow;
+    } else if (chart.defaultZoomWindow) {
+      effectiveZoomWindow = chart.defaultZoomWindow;
+    } else if (dashboardDefaultZoomWindow) {
+      effectiveZoomWindow = dashboardDefaultZoomWindow;
+    }
+
+    if (effectiveZoomWindow) {
+      const applied = applyCustomZoom(effectiveZoomWindow);
+      if (applied) {
+        hasAppliedDefaultZoomRef.current = true;
       }
-    : undefined;
+    }
+  }, [timeBounds.max, chart.defaultZoomWindow, dashboardDefaultZoomWindow, dashboardOverrideChartZoom, applyCustomZoom]);
 
-  const plotWrapperStyle = fillParent
-    ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }
-    : undefined;
+  const hasLeftAxis = variables.list.some(v => !v.useRightAxis);
+  const hasRightAxis = variables.list.some(v => v.useRightAxis);
+  const plotYRanges = useMemo(() => ({
+    left: hasLeftAxis ? yRanges.left : null,
+    right: hasRightAxis ? yRanges.right : null,
+  }), [hasLeftAxis, hasRightAxis, yRanges.left, yRanges.right]);
 
-  const plotStyle = fillParent ? { height: '100%' } : undefined;
+  const containerClassName = fillParent
+    ? 'chart-container chart-container--fill'
+    : 'chart-container';
+  const plotWrapperClassName = fillParent ? 'chart-plot-wrapper--fill' : undefined;
+  const plotClassName = fillParent ? 'chart-plot--fill' : undefined;
   const plotHeight = fillParent ? '100%' : 300;
 
   return (
-    <div className="chart-container" style={containerStyle}>
+    <div className={containerClassName}>
       <div className="chart-header">
         <h4>{chart.name || 'Untitled Chart'}</h4>
         <div className="chart-actions">
-          <div style={{ display: 'flex', gap: '0', marginRight: '0' }}>
-            {zoomPresets.map((preset) => (
+          <div className="chart-zoom-buttons">
+            {ZOOM_PRESETS.map((preset) => (
               <button
                 key={preset.label}
                 type="button"
                 onClick={() => applyZoom(preset.durationMs)}
                 disabled={!timeBounds.max}
-                style={{ padding: '0.25em 0.5em' }}
               >
                 {preset.label}
               </button>
             ))}
+            <input
+              type="text"
+              className="custom-zoom-input"
+              value={customZoomInput}
+              onChange={(e) => setCustomZoomInput(e.target.value)}
+              onKeyDown={handleCustomZoomKeyDown}
+              placeholder="Custom"
+            />
           </div>
         </div>
       </div>
 
       {error && <div className="error">{error}</div>}
 
-      <div style={plotWrapperStyle}>
+      <div className={plotWrapperClassName}>
         <Plot
           data={data}
-          variables={variables}
+          variables={variables.list}
           width="100%"
           height={plotHeight}
-          style={plotStyle}
+          className={plotClassName}
           formatYAsDurationMs={!!chart.formatYAsDurationMs}
           xRange={xRange}
-          yRanges={{
-            left: variables.some(v => !v.useRightAxis) ? yRanges.left : null,
-            right: variables.some(v => v.useRightAxis) ? yRanges.right : null,
-          }}
-          interpolateToLatest={shouldInterpolateToLatest}
-          cutFutureDatapoints={!!chart.cutFutureDatapoints}
+          yRanges={plotYRanges}
         />
       </div>
 
       <div className="chart-legend">
-        {variables.map((variable, idx) => (
+        {variables.list.map((variable, idx) => (
           <div key={idx} className="legend-item">
             <span className="legend-color" style={{ backgroundColor: variable.color || '#0066cc' }} />
             <span>
-              {variable.variable}
+              {variable.alias?.trim() || variable.variable}
               {variable.useRightAxis ? ' (Right axis)' : ''}
             </span>
           </div>

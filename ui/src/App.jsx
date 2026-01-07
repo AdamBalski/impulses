@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
+import { UserSettingsProvider } from './contexts/UserSettingsContext';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
@@ -10,6 +11,7 @@ import GCalIntegration from './pages/GCalIntegration';
 import Charts from './pages/Charts';
 import Dashboards from './pages/Dashboards';
 import LocalStorageSync from './pages/LocalStorageSync';
+import Settings from './pages/Settings';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -54,6 +56,7 @@ function Navigation() {
         <Link to="/dashboards">Dashboards</Link>
         <Link to="/charts">Charts</Link>
         <Link to="/storage-sync">Storage Sync</Link>
+        <Link to="/settings">Settings</Link>
       </div>
       <button className="nav-logout" onClick={logout}>Logout</button>
     </nav>
@@ -109,6 +112,11 @@ function AppContent() {
             <Charts />
           </ProtectedRoute>
         } />
+        <Route path="/charts/:chartId" element={
+          <ProtectedRoute>
+            <Charts />
+          </ProtectedRoute>
+        } />
         <Route path="/dashboards" element={
           <ProtectedRoute>
             <Dashboards />
@@ -124,6 +132,11 @@ function AppContent() {
             <LocalStorageSync />
           </ProtectedRoute>
         } />
+        <Route path="/settings" element={
+          <ProtectedRoute>
+            <Settings />
+          </ProtectedRoute>
+        } />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Routes>
       <div style={{ height: '30px' }}></div>
@@ -135,7 +148,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppContent />
+        <UserSettingsProvider>
+          <AppContent />
+        </UserSettingsProvider>
       </AuthProvider>
     </BrowserRouter>
   );

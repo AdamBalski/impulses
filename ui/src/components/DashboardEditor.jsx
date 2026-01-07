@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { format as formatPulseProgram } from '@impulses/sdk-typescript';
 
 export default function DashboardEditor({
   dashboard,
@@ -10,6 +11,10 @@ export default function DashboardEditor({
 }) {
   const [name, setName] = useState(dashboard?.name || '');
   const [description, setDescription] = useState(dashboard?.description || '');
+  const [program, setProgram] = useState(dashboard?.program || '');
+  const [defaultZoomWindow, setDefaultZoomWindow] = useState(dashboard?.defaultZoomWindow || '');
+  const [overrideChartZoom, setOverrideChartZoom] = useState(!!dashboard?.overrideChartZoom);
+  const programTextareaRef = useRef(null);
   const [layout, setLayout] = useState(
     (dashboard?.layout || []).map((item) => ({
       chartId: item.chartId || '',
@@ -22,6 +27,9 @@ export default function DashboardEditor({
   useEffect(() => {
     setName(dashboard?.name || '');
     setDescription(dashboard?.description || '');
+    setProgram(dashboard?.program || '');
+    setDefaultZoomWindow(dashboard?.defaultZoomWindow || '');
+    setOverrideChartZoom(!!dashboard?.overrideChartZoom);
     setLayout(
       (dashboard?.layout || []).map((item) => ({
         chartId: item.chartId || '',
@@ -134,6 +142,9 @@ export default function DashboardEditor({
       ...dashboard,
       name,
       description,
+      program,
+      defaultZoomWindow: defaultZoomWindow.trim() || null,
+      overrideChartZoom: !!overrideChartZoom,
       layout: validatedLayout,
     });
   }
@@ -142,6 +153,28 @@ export default function DashboardEditor({
     if (window.confirm(`Are you sure you want to delete dashboard "${name}"?`)) {
       onDelete(dashboard.id);
     }
+  }
+
+  function handleConcatenatePrograms() {
+    const referencedChartPrograms = layout
+      .map((item) => chartsMap[item.chartId]?.program?.trim())
+      .filter((prog) => typeof prog === 'string' && prog.length > 0);
+
+    if (referencedChartPrograms.length === 0) {
+      alert('No PulseLang programs found in the charts referenced by this dashboard.');
+      return;
+    }
+
+    if (
+      !window.confirm(
+        'Replace the dashboard PulseLang program with a concatenation of all referenced chart programs? This will overwrite the current dashboard program.'
+      )
+    ) {
+      return;
+    }
+
+    const concatenated = referencedChartPrograms.join('\n\n');
+    setProgram(concatenated);
   }
 
   return (
@@ -174,10 +207,69 @@ export default function DashboardEditor({
       </div>
 
       <div className="form-row">
+        <label>PulseLang Program (optional)</label>
+        <p className="layout-empty-hint">
+          Define variables here to share data across all charts. Charts will use these variables instead of computing their own programs.
+        </p>
+        <textarea
+          ref={programTextareaRef}
+          value={program}
+          onChange={(e) => setProgram(e.target.value)}
+          placeholder={'(define shared-data (data "metric"))\n(define processed (moving-avg shared-data 7))'}
+          rows={4}
+          className="textarea-fullwidth"
+        />
+        <div className="button-group">
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                const formatted = formatPulseProgram(program);
+                setProgram(formatted);
+              } catch (err) {
+                alert(`Failed to format program: ${err instanceof Error ? err.message : err}`);
+              }
+            }}
+            disabled={!program.trim()}
+          >
+            Format Program
+          </button>
+          <button
+            type="button"
+            onClick={handleConcatenatePrograms}
+            disabled={layout.length === 0}
+          >
+            Concatenate Chart Programs
+          </button>
+        </div>
+      </div>
+
+      <div className="form-row">
+        <label>Default Zoom Window</label>
+        <input
+          type="text"
+          value={defaultZoomWindow}
+          onChange={(e) => setDefaultZoomWindow(e.target.value)}
+          placeholder="e.g. -180d or -30d:0d"
+          style={{ maxWidth: '200px' }}
+        />
+        <p className="layout-empty-hint">Leave empty for no default zoom. Examples: -180d, -30d:7d</p>
+        <label className="checkbox-label" style={{ marginTop: '0.5em' }}>
+          <input
+            type="checkbox"
+            checked={overrideChartZoom}
+            onChange={(e) => setOverrideChartZoom(e.target.checked)}
+            disabled={!defaultZoomWindow.trim()}
+          />
+          Override individual chart zoom settings
+        </label>
+      </div>
+
+      <div className="form-row">
         <label>Layout</label>
         <div className="layout-list">
           {layout.length === 0 && (
-            <p style={{ color: '#666', fontStyle: 'italic' }}>No charts in layout. Click "Add Chart" to add one.</p>
+            <p className="layout-empty-hint">No charts in layout. Click "Add Chart" to add one.</p>
           )}
           {layout.map((item, index) => (
             <div key={index} className="layout-row">
@@ -230,31 +322,30 @@ export default function DashboardEditor({
               <button type="button" onClick={() => handleRemoveChart(index)}>
                 ✕
               </button>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.25em', fontSize: '0.85em' }}>
+              <label className="layout-checkbox-label">
                 <input
                   type="checkbox"
                   checked={!!item.interpolateToLatest}
                   onChange={(e) => handleChartChange(index, 'interpolateToLatest', e.target.checked)}
-                  style={{ width: 'auto', margin: 0 }}
                 />
                 Extend to now
               </label>
             </div>
           ))}
-          <button type="button" onClick={handleAddChart} style={{ marginTop: '0.5em' }}>
+          <button type="button" onClick={handleAddChart}>
             + Add Chart
           </button>
         </div>
       </div>
 
-      <div className="button-group" style={{ marginTop: '1em' }}>
+      <div className="button-group">
         <button type="button" onClick={handleSave}>
           Save
         </button>
         <button type="button" onClick={() => onCopy(dashboard.id)}>
           Copy
         </button>
-        <button type="button" onClick={handleDelete} style={{ background: '#c00', color: '#fff' }}>
+        <button type="button" onClick={handleDelete} className="btn-danger">
           Delete
         </button>
         <button type="button" onClick={onCancel}>

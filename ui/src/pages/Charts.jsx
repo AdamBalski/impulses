@@ -1,10 +1,27 @@
 import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { format as formatPulseProgram } from '@impulses/sdk-typescript';
 import Chart from '../components/Chart';
 import { DISPLAY_TYPE_OPTIONS, DISPLAY_TYPE_DEFAULT } from '../lib/displayTypes';
 
 const STORAGE_KEY = 'impulses_charts';
 const DEFAULT_COLOR = '#0066cc';
+
+const RESOLUTION_OPTIONS = [
+  { value: 'raw', label: 'Raw' },
+  { value: 'day', label: 'Day' },
+  { value: 'week', label: 'Week' },
+  { value: 'two_weeks', label: 'Two weeks' },
+  { value: 'month', label: 'Month' },
+];
+
+const ROLLUP_OPTIONS = [
+  { value: 'last', label: 'Last' },
+  { value: 'sum', label: 'Sum' },
+  { value: 'average', label: 'Average' },
+  { value: 'min', label: 'Min' },
+  { value: 'max', label: 'Max' },
+];
 
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -40,6 +57,8 @@ function ChartForm({
   setFormInterpolateToLatest,
   formCutFutureDatapoints,
   setFormCutFutureDatapoints,
+  formDefaultZoomWindow,
+  setFormDefaultZoomWindow,
   handleVariableChange,
   handleRemoveVariable,
   handleAddVariable,
@@ -97,10 +116,10 @@ function ChartForm({
             onChange={handleProgramChange}
             placeholder={'(define foo (data "metric"))'}
             rows={6}
-            style={{ width: '100%', maxWidth: 'none' }}
+            className="textarea-fullwidth"
             required
           />
-          <div className="button-group" style={{ marginTop: '0.5rem' }}>
+          <div className="button-group">
             <button
               type="button"
               onClick={() => {
@@ -117,7 +136,7 @@ function ChartForm({
           </div>
         </div>
 
-        <label style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-start', gap: '6px', whiteSpace: 'nowrap' }}>
+        <label className="checkbox-label">
           <input
             type="checkbox"
             checked={formFormatYAsDurationMs}
@@ -128,7 +147,7 @@ function ChartForm({
 
         <br />
 
-        <label style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-start', gap: '6px', whiteSpace: 'nowrap' }}>
+        <label className="checkbox-label">
           <input
             type="checkbox"
             checked={formInterpolateToLatest}
@@ -139,7 +158,7 @@ function ChartForm({
 
         <br />
 
-        <label style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-start', gap: '6px', whiteSpace: 'nowrap' }}>
+        <label className="checkbox-label">
           <input
             type="checkbox"
             checked={formCutFutureDatapoints}
@@ -148,41 +167,89 @@ function ChartForm({
           Hide datapoints after now
         </label>
 
+        <div>
+          <label>Default Zoom Window</label>
+          <input
+            type="text"
+            value={formDefaultZoomWindow}
+            onChange={e => setFormDefaultZoomWindow(e.target.value)}
+            placeholder="e.g. -180d or -30d:0d"
+            style={{ maxWidth: '200px' }}
+          />
+          <p className="layout-empty-hint">Leave empty for no default zoom. Examples: -180d, -30d:7d</p>
+        </div>
+
         <div className="impulses-section">
           <h4>Variables</h4>
           {formVariables.map((variable, idx) => (
-            <div key={idx} className="impulse-row">
-              <input
-                type="text"
-                value={variable.variable}
-                onChange={e => handleVariableChange(idx, 'variable', e.target.value)}
-                placeholder="Variable name"
-                required
-              />
-              <select
-                value={variable.displayType || DISPLAY_TYPE_DEFAULT}
-                onChange={e => handleVariableChange(idx, 'displayType', e.target.value)}
-              >
-                {DISPLAY_TYPE_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option.charAt(0).toUpperCase() + option.slice(1)}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="color"
-                value={variable.color}
-                onChange={e => handleVariableChange(idx, 'color', e.target.value)}
-              />
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <div key={idx} className="variable-block">
+              <div className="impulse-row">
                 <input
-                  type="checkbox"
-                  checked={!!variable.useRightAxis}
-                  onChange={e => handleVariableChange(idx, 'useRightAxis', e.target.checked)}
+                  type="text"
+                  value={variable.variable}
+                  onChange={e => handleVariableChange(idx, 'variable', e.target.value)}
+                  placeholder="Variable name"
+                  required
                 />
-                Right axis
-              </label>
-              <button type="button" onClick={() => handleRemoveVariable(idx)}>Remove</button>
+                <select
+                  value={variable.displayType || DISPLAY_TYPE_DEFAULT}
+                  onChange={e => handleVariableChange(idx, 'displayType', e.target.value)}
+                >
+                  {DISPLAY_TYPE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option.charAt(0).toUpperCase() + option.slice(1)}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="color"
+                  value={variable.color}
+                  onChange={e => handleVariableChange(idx, 'color', e.target.value)}
+                />
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={!!variable.useRightAxis}
+                    onChange={e => handleVariableChange(idx, 'useRightAxis', e.target.checked)}
+                  />
+                  Right axis
+                </label>
+                <button type="button" onClick={() => handleRemoveVariable(idx)}>Remove</button>
+              </div>
+              <div className="variable-settings-row">
+                <label className="variable-setting">
+                  <span>Alias:</span>
+                  <input
+                    type="text"
+                    value={variable.alias || ''}
+                    onChange={e => handleVariableChange(idx, 'alias', e.target.value)}
+                    placeholder="Display name"
+                  />
+                </label>
+                <label className="variable-setting">
+                  <span>Resolution:</span>
+                  <select
+                    value={variable.resolution || 'raw'}
+                    onChange={e => handleVariableChange(idx, 'resolution', e.target.value)}
+                  >
+                    {RESOLUTION_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="variable-setting">
+                  <span>Roll-up:</span>
+                  <select
+                    value={variable.rollUp || 'last'}
+                    onChange={e => handleVariableChange(idx, 'rollUp', e.target.value)}
+                    disabled={!variable.resolution || variable.resolution === 'raw'}
+                  >
+                    {ROLLUP_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
             </div>
           ))}
           <button type="button" onClick={handleAddVariable}>Add Variable</button>
@@ -211,11 +278,14 @@ function ChartForm({
 }
 
 export default function Charts() {
+  const { chartId } = useParams();
+  const navigate = useNavigate();
+
   const [chartsMap, setChartsMap] = useState(loadChartsFromStorage);
-  const [showForm, setShowForm] = useState(false);
-  const [editingChart, setEditingChart] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   const charts = Object.values(chartsMap);
+  const currentChart = chartId ? chartsMap[chartId] : null;
 
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
@@ -224,6 +294,8 @@ export default function Charts() {
   const [formFormatYAsDurationMs, setFormFormatYAsDurationMs] = useState(false);
   const [formInterpolateToLatest, setFormInterpolateToLatest] = useState(false);
   const [formCutFutureDatapoints, setFormCutFutureDatapoints] = useState(false);
+  const [formDefaultZoomWindow, setFormDefaultZoomWindow] = useState('');
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
 
   const isInitialMount = useRef(true);
 
@@ -243,34 +315,39 @@ export default function Charts() {
     setFormFormatYAsDurationMs(false);
     setFormInterpolateToLatest(false);
     setFormCutFutureDatapoints(false);
-    setEditingChart(null);
-    setShowForm(false);
+    setFormDefaultZoomWindow('');
+    setIsEditing(false);
+    setIsCreatingNew(false);
   }
 
   function handleCreateNew() {
     resetForm();
-    setShowForm(true);
+    setIsCreatingNew(true);
   }
 
-  function handleEdit(chart) {
-    setFormName(chart.name);
-    setFormDescription(chart.description || '');
-    setFormProgram(chart.program || '');
-    setFormVariables(chart.variables.map(variable => ({
-      ...variable,
-      useRightAxis: !!variable.useRightAxis,
-    })));
-    setFormFormatYAsDurationMs(!!chart.formatYAsDurationMs);
-    setFormInterpolateToLatest(!!chart.interpolateToLatest);
-    setFormCutFutureDatapoints(!!chart.cutFutureDatapoints);
-    setEditingChart(chart);
-    setShowForm(true);
+  function handleToggleEdit() {
+    if (isEditing) {
+      resetForm();
+    } else if (currentChart) {
+      setFormName(currentChart.name);
+      setFormDescription(currentChart.description || '');
+      setFormProgram(currentChart.program || '');
+      setFormVariables(currentChart.variables?.map(variable => ({
+        ...variable,
+        useRightAxis: !!variable.useRightAxis,
+      })) || []);
+      setFormFormatYAsDurationMs(!!currentChart.formatYAsDurationMs);
+      setFormInterpolateToLatest(!!currentChart.interpolateToLatest);
+      setFormCutFutureDatapoints(!!currentChart.cutFutureDatapoints);
+      setFormDefaultZoomWindow(currentChart.defaultZoomWindow || '');
+      setIsEditing(true);
+    }
   }
 
   function handleAddVariable() {
     setFormVariables([
       ...formVariables,
-      { variable: '', color: DEFAULT_COLOR, displayType: DISPLAY_TYPE_DEFAULT, useRightAxis: false },
+      { variable: '', color: DEFAULT_COLOR, displayType: DISPLAY_TYPE_DEFAULT, useRightAxis: false, alias: '', resolution: 'raw', rollUp: 'last' },
     ]);
   }
 
@@ -294,8 +371,9 @@ export default function Charts() {
   function handleSubmit(e) {
     e.preventDefault();
 
+    const newId = isCreatingNew ? generateId() : currentChart?.id;
     const chartData = {
-      id: editingChart?.id || generateId(),
+      id: newId,
       name: formName,
       description: formDescription,
       program: formProgram,
@@ -308,22 +386,28 @@ export default function Charts() {
       formatYAsDurationMs: !!formFormatYAsDurationMs,
       interpolateToLatest: !!formInterpolateToLatest,
       cutFutureDatapoints: !!formCutFutureDatapoints,
-      createdAt: editingChart?.createdAt || Date.now(),
+      defaultZoomWindow: formDefaultZoomWindow.trim() || null,
+      createdAt: isCreatingNew ? Date.now() : (currentChart?.createdAt || Date.now()),
       updatedAt: Date.now(),
     };
 
     upsertChart(chartData);
-
     resetForm();
+
+    if (isCreatingNew) {
+      navigate(`/charts/${newId}`);
+    }
   }
 
-  function handleDelete(chartId) {
+  function handleDelete(id) {
     if (confirm('Delete this chart?')) {
       setChartsMap(prev => {
         const next = { ...prev };
-        delete next[chartId];
+        delete next[id];
         return next;
       });
+      resetForm();
+      navigate('/charts');
     }
   }
 
@@ -331,15 +415,43 @@ export default function Charts() {
     upsertChart(updatedChart);
   }
 
+  const hasCharts = charts.length > 0;
+
   return (
     <div>
-      <h2>Charts</h2>
-
-      <div className="button-group">
-        <button onClick={handleCreateNew}>Create New Chart</button>
+      {/* Chart Picker */}
+      <div className="dashboard-picker">
+        <div className="dashboard-tabs">
+          {charts.map((chart) => (
+            <Link
+              key={chart.id}
+              to={`/charts/${chart.id}`}
+              className={`dashboard-tab ${chartId === chart.id ? 'active' : ''}`}
+            >
+              {chart.name || 'Untitled'}
+            </Link>
+          ))}
+          <button
+            type="button"
+            className="dashboard-tab dashboard-tab--new"
+            onClick={handleCreateNew}
+          >
+            + New
+          </button>
+          {chartId && currentChart && (
+            <button
+              type="button"
+              className="dashboard-tab"
+              onClick={handleToggleEdit}
+            >
+              {isEditing ? 'Cancel Edit' : 'Edit'}
+            </button>
+          )}
+        </div>
       </div>
 
-      {showForm && !editingChart && (
+      {/* New Chart Form */}
+      {isCreatingNew && (
         <ChartForm
           title="New Chart"
           submitLabel="Create"
@@ -356,6 +468,8 @@ export default function Charts() {
           setFormInterpolateToLatest={setFormInterpolateToLatest}
           formCutFutureDatapoints={formCutFutureDatapoints}
           setFormCutFutureDatapoints={setFormCutFutureDatapoints}
+          formDefaultZoomWindow={formDefaultZoomWindow}
+          setFormDefaultZoomWindow={setFormDefaultZoomWindow}
           handleVariableChange={handleVariableChange}
           handleRemoveVariable={handleRemoveVariable}
           handleAddVariable={handleAddVariable}
@@ -366,48 +480,64 @@ export default function Charts() {
         />
       )}
 
-      {charts.length === 0 && !showForm && (
-        <p>No charts yet. Create one to get started.</p>
+      {/* No chart selected prompt */}
+      {!chartId && !isCreatingNew && (
+        <div className="card">
+          <p>
+            {hasCharts
+              ? 'Select a chart from the tabs above to view it.'
+              : 'No charts yet. Click "+ New" to create your first chart.'}
+          </p>
+        </div>
       )}
 
-      {charts.map(chart => (
-        <div key={chart.id} className="chart-wrapper">
-          {editingChart?.id === chart.id && (
-            <ChartForm
-              title="Edit Chart"
-              submitLabel="Update"
-              formName={formName}
-              setFormName={setFormName}
-              formDescription={formDescription}
-              setFormDescription={setFormDescription}
-              formProgram={formProgram}
-              setFormProgram={setFormProgram}
-              formVariables={formVariables}
-              formFormatYAsDurationMs={formFormatYAsDurationMs}
-              setFormFormatYAsDurationMs={setFormFormatYAsDurationMs}
-              formInterpolateToLatest={formInterpolateToLatest}
-              setFormInterpolateToLatest={setFormInterpolateToLatest}
-              formCutFutureDatapoints={formCutFutureDatapoints}
-              setFormCutFutureDatapoints={setFormCutFutureDatapoints}
-              handleVariableChange={handleVariableChange}
-              handleRemoveVariable={handleRemoveVariable}
-              handleAddVariable={handleAddVariable}
-              handleSubmit={handleSubmit}
-              onCancel={resetForm}
-              onDelete={handleDelete}
-              editingChart={editingChart}
-            />
-          )}
+      {/* Edit form for current chart */}
+      {chartId && currentChart && isEditing && (
+        <ChartForm
+          title="Edit Chart"
+          submitLabel="Update"
+          formName={formName}
+          setFormName={setFormName}
+          formDescription={formDescription}
+          setFormDescription={setFormDescription}
+          formProgram={formProgram}
+          setFormProgram={setFormProgram}
+          formVariables={formVariables}
+          formFormatYAsDurationMs={formFormatYAsDurationMs}
+          setFormFormatYAsDurationMs={setFormFormatYAsDurationMs}
+          formInterpolateToLatest={formInterpolateToLatest}
+          setFormInterpolateToLatest={setFormInterpolateToLatest}
+          formCutFutureDatapoints={formCutFutureDatapoints}
+          setFormCutFutureDatapoints={setFormCutFutureDatapoints}
+          formDefaultZoomWindow={formDefaultZoomWindow}
+          setFormDefaultZoomWindow={setFormDefaultZoomWindow}
+          handleVariableChange={handleVariableChange}
+          handleRemoveVariable={handleRemoveVariable}
+          handleAddVariable={handleAddVariable}
+          handleSubmit={handleSubmit}
+          onCancel={resetForm}
+          onDelete={handleDelete}
+          editingChart={currentChart}
+        />
+      )}
+
+      {/* Current chart display */}
+      {chartId && currentChart && !isEditing && (
+        <div className="chart-wrapper">
           <Chart
-            chart={chart}
+            chart={currentChart}
             onUpdate={handleUpdate}
             onDelete={handleDelete}
           />
-          <button onClick={() => handleEdit(chart)} className="edit-chart-btn">
-            Edit Chart Settings
-          </button>
         </div>
-      ))}
+      )}
+
+      {/* Chart not found */}
+      {chartId && !currentChart && (
+        <div className="card">
+          <p>Chart not found. It may have been deleted.</p>
+        </div>
+      )}
     </div>
   );
 }

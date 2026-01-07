@@ -213,6 +213,25 @@ th {
   word-break: break-all;
 }
 
+/* Inline checkbox label */
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+/* Full-width textarea override */
+.textarea-fullwidth {
+  width: 100%;
+  max-width: none;
+}
+
 @media (max-width: 600px) {
   body {
     font-size: 16px;
