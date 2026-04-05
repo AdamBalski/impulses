@@ -1,14 +1,17 @@
 FROM node:20-alpine AS build
 
-WORKDIR /app/ui
-
 ARG VITE_API_URL=/impulses/api
 ENV VITE_API_URL=${VITE_API_URL}
 
 COPY client-sdks/typescript /app/client-sdks/typescript
 COPY ui /app/ui
 
+WORKDIR /app/client-sdks/typescript
 RUN npm install
+RUN npm run build
+
+WORKDIR /app/ui
+RUN npm install --ignore-scripts
 RUN npm run build
 
 FROM alpine:3.20
