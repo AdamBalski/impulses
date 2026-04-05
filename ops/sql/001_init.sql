@@ -1,35 +1,21 @@
--- User role enum
-do $$ begin
-  create type user_role as enum ('ADMIN', 'STANDARD');
-exception when duplicate_object then null; end $$;
-
--- Users table
 create table if not exists app_user (
-  id uuid primary key default gen_random_uuid(),
+  id text primary key,
   email text unique not null,
   password_hash text not null,
-  role user_role not null default 'STANDARD',
-  created_at timestamptz not null default now(),
-  deleted_at timestamptz
+  role text not null default 'STANDARD' check (role in ('ADMIN', 'STANDARD')),
+  created_at integer not null,
+  deleted_at integer
 );
-
--- Token capability enum
--- API is for querying data and maybe later for setting up dashboards
--- INGEST is for ingesting data
--- SUPER is for everything
-do $$ begin
-  create type token_capability as enum ('API', 'INGEST', 'SUPER');
-exception when duplicate_object then null; end $$;
 
 -- Data tokens table
 create table if not exists data_token (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references app_user(id),
+  id text primary key,
+  user_id text not null references app_user(id),
   name text not null,
   token_hash text not null,
-  capability token_capability not null,
-  expires_at timestamptz not null,
-  created_at timestamptz not null default now()
+  capability text not null check (capability in ('API', 'INGEST', 'SUPER')),
+  expires_at integer not null,
+  created_at integer not null
 );
 
 -- Indexes for performance
@@ -39,12 +25,12 @@ create index if not exists idx_data_token_expires_at on data_token(expires_at);
 
 -- Local storage sync table
 create table if not exists local_storage_entry (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references app_user(id),
+  id text primary key,
+  user_id text not null references app_user(id),
   key text not null,
   value text not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
+  created_at integer not null,
+  updated_at integer not null,
   unique (user_id, key)
 );
 

@@ -16,7 +16,7 @@ from src.common import health
 from src.common import state
 from src.dao import data_dao
 from src.db import dao
-from src.db import pg as dbpg
+from src.db import sqlite as dbsqlite
 from src.dao import user_repo, token_repo
 from src.resources import data
 from src.resources import google_oauth2
@@ -61,19 +61,24 @@ def schedule_jobs(jobs: list[job.Job]):
         scheduler.add_job(runner_fn, 'interval', seconds=job_obj.interval())
     scheduler.start()
 
+def get_storage_dir() -> pathlib.Path:
+    default_dir = pathlib.Path(__file__).resolve().parents[1] / "data-store"
+    return pathlib.Path(os.environ.get("DATA_STORE_DIR", str(default_dir)))
+
 def main():
     global app_state
     google_oauth2_creds = json.loads(get_from_env_or_fail("GOOGLE_OAUTH2_CREDS"))
     status = health.AppHealth(health.HealthStatus.UP)
-    db_dao = dao.PersistentDao(pathlib.Path("./data-store"))
-    pg_conn_json = get_from_env_or_fail("POSTGRES_CONN_JSON")
-    pg_pool = dbpg.connect_from_json(pg_conn_json)
+    storage_dir = get_storage_dir()
+    db_dao = dao.PersistentDao(storage_dir)
+    sqlite_db_path = os.environ.get("SQLITE_DB_PATH", str(storage_dir / "impulses.sqlite3"))
+    db_pool = dbsqlite.connect(sqlite_db_path)
     session_ttl_sec = int(os.environ.get("SESSION_TTL_SEC", "1800"))
     session_store = SessionStore(ttl_seconds=session_ttl_sec)
     
     # Initialize token cache and load from database
     token_cache = TokenCache()
-    token_repository = token_repo.TokenRepo(pg_pool)
+    token_repository = token_repo.TokenRepo(db_pool)
     token_cache.load_from_db(token_repository)
     logging.info(f"Loaded {token_cache.size()} active tokens into cache")
     
@@ -88,10 +93,10 @@ def main():
     )) \
         .provide_obj(data_dao.DataDao(db_dao)) \
         .provide_obj(db_dao) \
-        .provide_obj(pg_pool) \
-        .provide_obj(user_repo.UserRepo(pg_pool)) \
+        .provide_obj(db_pool) \
+        .provide_obj(user_repo.UserRepo(db_pool)) \
         .provide_obj(token_repository) \
-        .provide_obj(local_storage_repo.LocalStorageRepo(pg_pool)) \
+        .provide_obj(local_storage_repo.LocalStorageRepo(db_pool)) \
         .provide_obj(session_store) \
         .provide_obj(token_cache) \
         .provide_obj(gcal_dao) \
@@ -154,4 +159,3 @@ if __name__ == "__main__":
     except BaseException:
         logging.exception(f"Exception raised, quitting...")
         raise
-

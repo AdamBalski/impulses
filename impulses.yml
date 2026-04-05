@@ -1,0 +1,23 @@
+services:
+  impulses-app:
+    image: ghcr.io/adambalski/impulses-app:${IMPULSES_APP_VERSION:-latest}
+    container_name: impulses-app
+    restart: unless-stopped
+    environment:
+      PORT: "8000"
+      GOOGLE_OAUTH2_CREDS: ${GOOGLE_OAUTH2_CREDS}
+      ORIGIN: "https://adam-balski.duckdns.org/impulses"
+      ORIGIN_API: "https://adam-balski.duckdns.org/impulses/api"
+      SESSION_TTL_SEC: "${SESSION_TTL_SEC:-1800}"
+      SQLITE_DB_PATH: /app/server/data-store/impulses.sqlite3
+    volumes:
+      - ./impulses-data:/app/server/data-store
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  impulses-ui:
+    image: ghcr.io/adambalski/impulses-ui:${IMPULSES_UI_VERSION:-latest}
+    container_name: impulses-ui
+    restart: unless-stopped
+    volumes:
+      - ./impulses-ui:/srv/impulses

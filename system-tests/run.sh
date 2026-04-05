@@ -15,7 +15,7 @@ cleanup() {
 trap cleanup EXIT
 
 echo "Starting isolated test stack..."
-$COMPOSE_CMD up --build -d postgres app
+$COMPOSE_CMD up --build -d app
 
 echo "Running tester container..."
 TEST_ARGS="$*" $COMPOSE_CMD up --build --abort-on-container-exit tester

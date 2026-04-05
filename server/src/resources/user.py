@@ -1,12 +1,12 @@
 import bcrypt
 import fastapi
 import pydantic
-import psycopg
 
 from src.auth import user_auth
 from src.auth.session import SessionStore
 from src.auth.token_cache import TokenCache
 from src.common import state
+from src.db.sqlite import DuplicateKeyError
 from src.dao.user_repo import UserRepo, User as UserModel
 
 router = fastapi.APIRouter()
@@ -46,7 +46,7 @@ async def create_user(body: CreateUserBody,
     try:
         created = users.create_user(body.email, password_hash, role)
         return _to_user_dto(created)
-    except psycopg.errors.UniqueViolation:
+    except DuplicateKeyError:
         raise fastapi.HTTPException(status_code=409, detail="User with this email already exists")
 
 @router.post("/login")

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import time
 import typing
+import uuid
 
 import pydantic
 
-from src.db.pg import PgPool
+from src.db.sqlite import SqlitePool
 
 
 class LocalStorageEntry(pydantic.BaseModel):
@@ -28,20 +30,20 @@ def _to_entry(row: dict) -> LocalStorageEntry:
 
 
 class LocalStorageRepo:
-    def __init__(self, pool: PgPool):
+    def __init__(self, pool: SqlitePool):
         self.pool = pool
 
     def list_entries(self, user_id: str) -> list[LocalStorageEntry]:
         rows = self.pool.execute(
             """
-            select id::text as id,
-                   user_id::text as user_id,
+            select id,
+                   user_id,
                    key,
                    value,
-                   extract(epoch from created_at)::bigint as created_at,
-                   extract(epoch from updated_at)::bigint as updated_at
+                   created_at,
+                   updated_at
             from local_storage_entry
-            where user_id = %s::uuid
+            where user_id = ?
             order by key asc
             """,
             [user_id],
@@ -51,42 +53,37 @@ class LocalStorageRepo:
     def get_entry_by_key(self, user_id: str, key: str) -> typing.Optional[LocalStorageEntry]:
         rows = self.pool.execute(
             """
-            select id::text as id,
-                   user_id::text as user_id,
+            select id,
+                   user_id,
                    key,
                    value,
-                   extract(epoch from created_at)::bigint as created_at,
-                   extract(epoch from updated_at)::bigint as updated_at
+                   created_at,
+                   updated_at
             from local_storage_entry
-            where user_id = %s::uuid and key = %s
+            where user_id = ? and key = ?
             """,
             [user_id, key],
         )
         return _to_entry(rows[0]) if rows else None
 
     def upsert_entry(self, user_id: str, key: str, value: str) -> LocalStorageEntry:
-        rows = self.pool.execute(
+        now = int(time.time())
+        self.pool.execute(
             """
-            insert into local_storage_entry (user_id, key, value)
-            values (%s::uuid, %s, %s)
+            insert into local_storage_entry (id, user_id, key, value, created_at, updated_at)
+            values (?, ?, ?, ?, ?, ?)
             on conflict (user_id, key) do update
             set value = excluded.value,
-                updated_at = now()
-            returning id::text as id,
-                      user_id::text as user_id,
-                      key,
-                      value,
-                      extract(epoch from created_at)::bigint as created_at,
-                      extract(epoch from updated_at)::bigint as updated_at
+                updated_at = excluded.updated_at
             """,
-            [user_id, key, value],
+            [str(uuid.uuid4()), user_id, key, value, now, now],
         )
-        return _to_entry(rows[0])
+        return self.get_entry_by_key(user_id, key)
 
     def delete_entry(self, user_id: str, key: str) -> None:
         self.pool.execute(
             """
-            delete from local_storage_entry where user_id = %s::uuid and key = %s
+            delete from local_storage_entry where user_id = ? and key = ?
             """,
             [user_id, key],
         )
@@ -94,7 +91,7 @@ class LocalStorageRepo:
     def delete_entry_by_id(self, user_id: str, entry_id: str) -> None:
         self.pool.execute(
             """
-            delete from local_storage_entry where user_id = %s::uuid and id = %s::uuid
+            delete from local_storage_entry where user_id = ? and id = ?
             """,
             [user_id, entry_id],
         )

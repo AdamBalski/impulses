@@ -1,35 +1,17 @@
 services:
-  postgres:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: impulses
-      POSTGRES_USER: impulses_user
-      POSTGRES_PASSWORD: impulses_password
-    volumes:
-      - postgres_test_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h localhost -U impulses_user -d impulses"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    networks:
-      - impulses-test
-
   app:
     build:
-      context: ../server
-      dockerfile: ../sandbox/Dockerfile.app
+      context: ..
+      dockerfile: ./Dockerfile.app
     environment:
       PORT: "8000"
-      POSTGRES_CONN_JSON: '{"host": "postgres", "port": 5432, "dbname": "impulses", "user": "impulses_user", "password": "impulses_password"}'
+      SQLITE_DB_PATH: /app/server/data-store/impulses.sqlite3
       SESSION_TTL_SEC: "1800"
       ORIGIN: http://app:8000
+      ORIGIN_API: http://app:8000
       GOOGLE_OAUTH2_CREDS: '{}'
     volumes:
-      - app_test_data:/app/data-store
-    depends_on:
-      postgres:
-        condition: service_healthy
+      - app_test_data:/app/server/data-store
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8000/healthz | grep -q 'UP'"]
       interval: 5s
@@ -57,7 +39,6 @@ services:
       - impulses-test
 
 volumes:
-  postgres_test_data:
   app_test_data:
 
 networks:

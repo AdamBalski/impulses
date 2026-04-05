@@ -15,7 +15,7 @@ The Impulses Server is a Python-based backend that provides:
 - **Background jobs:** Heartbeat job, Google Calendar polling job.
 - **Datastore:** Persistent storage for metrics under `./data-store/persistent_obj_dir`.
 - **OAuth2 handling:** Manages user credentials and refresh tokens for Google Calendar access.
-- **PostgresqlDB** Store users and access tokens
+- **SQLite DB** Stores users, tokens, and local storage state
 
 ---
 
@@ -23,8 +23,8 @@ The Impulses Server is a Python-based backend that provides:
 
 - **Python:** 3.13.1+ recommended
 - **OS:** Linux or macOS
-- **Database:** PostgreSQL 12+
-- **Python dependencies:** See `requirements.txt` (includes FastAPI, PostgreSQL driver, Google client libraries, etc.)
+- **Database:** SQLite
+- **Python dependencies:** See `requirements.txt` (includes FastAPI, SQLite-backed app code, Google client libraries, etc.)
 
 **Environment Variables:**
 
@@ -33,7 +33,7 @@ The Impulses Server is a Python-based backend that provides:
 | `PORT` | ✔ | ✔ | ✔ | Port the application listens on |
 | `GOOGLE_OAUTH2_CREDS` | ✔ | ✔ | ✔ | Google OAuth2 client credentials JSON [(look at the gcal job specific doc)](./G_CAL_POLLING_JOB.md) |
 | `ORIGIN` | ✔ | ✔ | ✔ | Protocol + domain + port (for OAuth2 redirects) |
-| `POSTGRES_CONN_JSON` | ✔ | ✔ | ✔ | PostgreSQL connection config as JSON string |
+| `SQLITE_DB_PATH` | ✘ (defaults to `server/data-store/impulses.sqlite3`) | ✘ (optional) | ✘ (optional) | Path to the SQLite database file |
 | `SESSION_TTL_SEC` | ✘ (defaults to 1800) | ✘ (optional) | ✘ (optional) | Session cookie TTL in seconds |
 | `REMOTE_HOST` | ✘ | ✔ | ✔ | Hostname for SSH deployment |
 | `REMOTE_PORT` | ✘ | ✔ | ✔ | SSH port for remote host |
@@ -63,14 +63,14 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-4. Set up PostgreSQL database and run migrations:
+4. Initialize the SQLite database:
 
 ```bash
-# Set your PostgreSQL connection config
-export POSTGRES_CONN_JSON='{"host":"localhost","port":5432,"dbname":"impulses","user":"your_user","password":"your_password","sslmode":"prefer"}'
+# Optional: override the default database path
+# export SQLITE_DB_PATH="$PWD/data-store/impulses.sqlite3"
 
 # Run database migrations
-bash ./ops/db_migrate.sh
+bash ../ops/db_migrate.sh
 ```
 
 5. Set additional environment variables:
@@ -79,8 +79,9 @@ bash ./ops/db_migrate.sh
 export PORT=8000
 export GOOGLE_OAUTH2_CREDS='json-string-of-creds'
 export ORIGIN='http://localhost:8000'
-export POSTGRES_CONN_JSON='{"host":"localhost","port":5432,"dbname":"impulses","user":"your_user","password":"your_password","sslmode":"prefer"}'
+export ORIGIN_API='http://localhost:8000'
 # Optional: export SESSION_TTL_SEC=1800
+# Optional: export SQLITE_DB_PATH="$PWD/data-store/impulses.sqlite3"
 ```
 
 6. Run the server:
@@ -101,7 +102,7 @@ Look at [sandbox](../sandbox) to see more.
 
 ### 4.2 Manual/Local
 - Run the server directly on your machine without Docker
-- Requires manual PostgreSQL setup and venv configuration
+- Requires only the local venv and a writable SQLite database file
 - Follow steps in section 3 above
 
 ### 4.3 Deploy via `deploy.sh`
@@ -252,7 +253,7 @@ AST node forms:
 
 ## 7. Data Persistence
 
-- Persistent storage is in: `./data-store/persistent_obj_dir` and postgresql if you wished to back-up the data
+- Persistent storage is in: `./data-store/persistent_obj_dir` and `./data-store/impulses.sqlite3`
 
 ---
 

@@ -13,6 +13,9 @@ import Dashboards from './pages/Dashboards';
 import LocalStorageSync from './pages/LocalStorageSync';
 import Settings from './pages/Settings';
 
+const BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '');
+const FAVICON_URL = `${import.meta.env.BASE_URL}favicon.svg`;
+
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
   
@@ -67,7 +70,7 @@ function AppContent() {
   return (
     <>
       <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <img src="/favicon.svg" alt="Impulses logo" width="64" height="64" />
+        <img src={FAVICON_URL} alt="Impulses logo" width="64" height="64" />
         Impulses
       </h1>
       <Navigation />
@@ -146,7 +149,7 @@ function AppContent() {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={BASENAME}>
       <AuthProvider>
         <UserSettingsProvider>
           <AppContent />

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import time
 import typing
+import uuid
 
 import pydantic
 
-from src.db.pg import PgPool
+from src.db.sqlite import SqlitePool
 
 
 class Token(pydantic.BaseModel):
@@ -28,19 +30,19 @@ def _to_token(row: dict) -> Token:
     )
 
 class TokenRepo:
-    def __init__(self, pool: PgPool):
+    def __init__(self, pool: SqlitePool):
         self.pool = pool
 
     def list_tokens(self, user_id: str) -> list[Token]:
         rows = self.pool.execute(
             """
-            select id::text as id,
+            select id,
                    name,
-                   capability::text as capability,
-                   extract(epoch from expires_at)::bigint as expires_at,
-                   extract(epoch from created_at)::bigint as created_at
+                   capability,
+                   expires_at,
+                   created_at
             from data_token
-            where user_id = %s::uuid
+            where user_id = ?
             order by created_at desc
             """,
             [user_id],
@@ -48,24 +50,36 @@ class TokenRepo:
         return [_to_token(r) for r in rows]
 
     def create_token(self, user_id: str, name: str, capability: str, expires_at_ts: int, token_hash: str) -> Token:
-        rows = self.pool.execute(
+        row = {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "name": name,
+            "token_hash": token_hash,
+            "capability": capability,
+            "expires_at": expires_at_ts,
+            "created_at": int(time.time()),
+        }
+        self.pool.execute(
             """
-            insert into data_token (user_id, name, token_hash, capability, expires_at)
-            values (%s::uuid, %s, %s, %s::token_capability, to_timestamp(%s))
-            returning id::text as id,
-                      name,
-                      capability::text as capability,
-                      extract(epoch from expires_at)::bigint as expires_at,
-                      extract(epoch from created_at)::bigint as created_at
+            insert into data_token (id, user_id, name, token_hash, capability, expires_at, created_at)
+            values (?, ?, ?, ?, ?, ?, ?)
             """,
-            [user_id, name, token_hash, capability, expires_at_ts],
+            [
+                row["id"],
+                row["user_id"],
+                row["name"],
+                row["token_hash"],
+                row["capability"],
+                row["expires_at"],
+                row["created_at"],
+            ],
         )
-        return _to_token(rows[0])
+        return _to_token(row)
 
     def delete_token_by_name(self, user_id: str, name: str) -> None:
         self.pool.execute(
             """
-            delete from data_token where user_id = %s::uuid and name = %s
+            delete from data_token where user_id = ? and name = ?
             """,
             [user_id, name],
         )
@@ -73,44 +87,44 @@ class TokenRepo:
     def get_token_hash_and_capability(self, user_id: str, name: str) -> typing.Optional[dict]:
         rows = self.pool.execute(
             """
-            select token_hash, capability::text as capability
+            select token_hash, capability
             from data_token
-            where user_id = %s::uuid and name = %s and now() < expires_at
+            where user_id = ? and name = ? and ? < expires_at
             """,
-            [user_id, name],
+            [user_id, name, int(time.time())],
         )
         return rows[0] if rows else None
 
     def list_all_active_tokens(self) -> list[Token]:
         rows = self.pool.execute(
             """
-            select id::text as id,
-                   user_id::text as user_id,
+            select id,
+                   user_id,
                    name,
                    token_hash,
-                   capability::text as capability,
-                   extract(epoch from expires_at)::bigint as expires_at,
-                   extract(epoch from created_at)::bigint as created_at
+                   capability,
+                   expires_at,
+                   created_at
             from data_token
-            where now() < expires_at
+            where ? < expires_at
             order by created_at desc
             """,
-            [],
+            [int(time.time())],
         )
         return [_to_token(r) for r in rows]
     
     def get_token_by_id(self, token_id: str) -> typing.Optional[Token]:
         rows = self.pool.execute(
             """
-            select id::text as id,
-                   user_id::text as user_id,
+            select id,
+                   user_id,
                    name,
                    token_hash,
-                   capability::text as capability,
-                   extract(epoch from expires_at)::bigint as expires_at,
-                   extract(epoch from created_at)::bigint as created_at
+                   capability,
+                   expires_at,
+                   created_at
             from data_token
-            where id = %s::uuid
+            where id = ?
             """,
             [token_id],
         )
@@ -119,15 +133,15 @@ class TokenRepo:
     def get_token_by_name(self, user_id: str, name: str) -> typing.Optional[Token]:
         rows = self.pool.execute(
             """
-            select id::text as id,
-                   user_id::text as user_id,
+            select id,
+                   user_id,
                    name,
                    token_hash,
-                   capability::text as capability,
-                   extract(epoch from expires_at)::bigint as expires_at,
-                   extract(epoch from created_at)::bigint as created_at
+                   capability,
+                   expires_at,
+                   created_at
             from data_token
-            where user_id = %s::uuid and name = %s
+            where user_id = ? and name = ?
             """,
             [user_id, name],
         )
@@ -136,7 +150,7 @@ class TokenRepo:
     def delete_token_by_id(self, user_id: str, token_id: str) -> None:
         self.pool.execute(
             """
-            delete from data_token where user_id = %s::uuid and id = %s::uuid
+            delete from data_token where user_id = ? and id = ?
             """,
             [user_id, token_id],
         )
@@ -144,15 +158,15 @@ class TokenRepo:
     def get_token_by_hash(self, user_id: str, token_hash: str) -> typing.Optional[Token]:
         rows = self.pool.execute(
             """
-            select id::text as id,
-                   user_id::text as user_id,
+            select id,
+                   user_id,
                    name,
                    token_hash,
-                   capability::text as capability,
-                   extract(epoch from expires_at)::bigint as expires_at,
-                   extract(epoch from created_at)::bigint as created_at
+                   capability,
+                   expires_at,
+                   created_at
             from data_token
-            where user_id = %s::uuid and token_hash = %s
+            where user_id = ? and token_hash = ?
             """,
             [user_id, token_hash],
         )
