@@ -12,17 +12,27 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.ai.client_session_registry import ClientSessionRegistry
 from src.common import health
 from src.common import state
 from src.dao import data_dao
 from src.db import dao
 from src.db import sqlite as dbsqlite
 from src.dao import user_repo, token_repo
+from src.dao.chart_repo import ChartRepo
+from src.dao.dashboard_repo import DashboardRepo
+from src.dao.llm_model_repo import LlmModelRepo
+from src.dao.ai_chat_repo import AiChatRepo
 from src.resources import data
 from src.resources import google_oauth2
 from src.resources import user
 from src.resources import token
+from src.resources import chart
+from src.resources import dashboard
 from src.resources import local_storage
+from src.resources import ai
+from src.resources import ai_model
+from src.resources import app_websocket
 from src.dao import local_storage_repo
 from src.job import job
 from src.job import heartbeat_job
@@ -96,7 +106,12 @@ def main():
         .provide_obj(db_pool) \
         .provide_obj(user_repo.UserRepo(db_pool)) \
         .provide_obj(token_repository) \
+        .provide_obj(ChartRepo(db_pool)) \
+        .provide_obj(DashboardRepo(db_pool)) \
+        .provide_obj(LlmModelRepo(db_pool)) \
+        .provide_obj(AiChatRepo(db_pool)) \
         .provide_obj(local_storage_repo.LocalStorageRepo(db_pool)) \
+        .provide_obj(ClientSessionRegistry()) \
         .provide_obj(session_store) \
         .provide_obj(token_cache) \
         .provide_obj(gcal_dao) \
@@ -106,6 +121,7 @@ def main():
 
     @asynccontextmanager
     async def lifespan(_: fastapi.FastAPI):
+        app_state.provide_obj_as(asyncio.AbstractEventLoop, asyncio.get_running_loop())
         schedule_jobs(app_state.get_jobs())
         yield
         shutdown_handler(status)
@@ -125,7 +141,12 @@ def main():
     app.include_router(data.router, prefix="/data")
     app.include_router(user.router, prefix="/user")
     app.include_router(token.router, prefix="/token")
+    app.include_router(chart.router, prefix="/chart")
+    app.include_router(dashboard.router, prefix="/dashboard")
     app.include_router(local_storage.router, prefix="/local-storage")
+    app.include_router(ai.router, prefix="/ai")
+    app.include_router(ai_model.router, prefix="/ai/models")
+    app.include_router(app_websocket.router, prefix="/ws")
 
 
     @app.get("/healthz")

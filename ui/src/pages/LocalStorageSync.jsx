@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
+import { loadChartsFromStorage } from '../lib/chartStorage';
+import { loadDashboardsFromStorage } from '../lib/dashboardStorage';
 
 const BLOCKLIST = [
   'impulses_token',
@@ -34,6 +36,7 @@ export default function LocalStorageSync() {
   const [customKey, setCustomKey] = useState('');
   const [customValue, setCustomValue] = useState('');
   const [savingCustom, setSavingCustom] = useState(false);
+  const [exportingVisualizations, setExportingVisualizations] = useState(false);
 
   useEffect(() => {
     refreshLocalEntries();
@@ -145,6 +148,58 @@ export default function LocalStorageSync() {
     }
   }
 
+  async function handleExportVisualizations() {
+    const chartsMap = loadChartsFromStorage();
+    const dashboardsMap = loadDashboardsFromStorage();
+    const charts = Object.values(chartsMap);
+    const dashboards = Object.values(dashboardsMap);
+
+    if (charts.length === 0 && dashboards.length === 0) {
+      setError('No local charts or dashboards found to export');
+      return;
+    }
+
+    if (!confirm(`Export ${charts.length} charts and ${dashboards.length} dashboards to the backend?`)) {
+      return;
+    }
+
+    try {
+      setExportingVisualizations(true);
+      setError('');
+      const result = await api.importLocalChartDashboardBundle({
+        charts: charts.map((chart) => ({
+          local_id: chart.id,
+          name: chart.name || '',
+          description: chart.description || '',
+          program: chart.program || '',
+          variables: Array.isArray(chart.variables) ? chart.variables : [],
+          format_y_as_duration_ms: !!chart.formatYAsDurationMs,
+          interpolate_to_latest: !!chart.interpolateToLatest,
+          cut_future_datapoints: !!chart.cutFutureDatapoints,
+          default_zoom_window: chart.defaultZoomWindow || null,
+          created_at: chart.createdAt || null,
+          updated_at: chart.updatedAt || null,
+        })),
+        dashboards: dashboards.map((dashboard) => ({
+          local_id: dashboard.id,
+          name: dashboard.name || '',
+          description: dashboard.description || '',
+          program: dashboard.program || '',
+          default_zoom_window: dashboard.defaultZoomWindow || null,
+          override_chart_zoom: !!dashboard.overrideChartZoom,
+          layout: Array.isArray(dashboard.layout) ? dashboard.layout : [],
+          created_at: dashboard.createdAt || null,
+          updated_at: dashboard.updatedAt || null,
+        })),
+      });
+      setNotice(`Exported ${result.charts_created} charts and ${result.dashboards_created} dashboards to the backend`);
+    } catch (err) {
+      setError(err.message || 'Failed to export local visualizations');
+    } finally {
+      setExportingVisualizations(false);
+    }
+  }
+
   return (
     <div>
       <h2>Local Storage Sync</h2>
@@ -152,6 +207,14 @@ export default function LocalStorageSync() {
 
       {error && <div className="error">{error}</div>}
       {notice && <div className="success">{notice}</div>}
+
+      <div className="card">
+        <h3>Charts & Dashboards Export</h3>
+        <p>Export locally stored charts and dashboards into the backend database. The backend will generate fresh UUIDs and remap dashboard chart references during import.</p>
+        <button type="button" onClick={handleExportVisualizations} disabled={exportingVisualizations}>
+          {exportingVisualizations ? 'Exporting...' : 'Export Charts & Dashboards to Backend'}
+        </button>
+      </div>
 
       <div className="card">
         <h3>Set Custom Key/Value</h3>

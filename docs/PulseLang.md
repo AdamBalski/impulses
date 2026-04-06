@@ -23,14 +23,14 @@ PulseLang is Impulses' declarative stream-computation language. It uses an S-exp
 Evaluate scripts through the TypeScript SDK:
 
 ```ts
-import { ImpulsesClient, compute } from "@impulses/sdk-typescript";
+import { ImpulsesClient, COMMON_LIBRARY, compute } from "@impulses/sdk-typescript";
 
 const client = new ImpulsesClient({ url, tokenValue });
-const streams = await compute(client, pulseLangProgram);
+const streams = await compute(client, COMMON_LIBRARY, pulseLangProgram);
 const expenses30d = streams.get("expenses-30d");
 ```
 
-See `tests/dsl/interpreter.test.ts` for a Vitest example using mocked streams.
+See `client-sdks/typescript/tests/dsl/interpreter.test.ts` for a Vitest example using mocked streams.
 
 ## Syntax
 
@@ -51,9 +51,12 @@ PulseLang ships with a runtime environment that matches the TypeScript interpret
 
 ### Stream helpers
 - `(data name)` — fetch a remote metric stream via the SDK client (calls `ImpulsesClient.fetchDatapoints` under the hood). Streams are cached by name per runtime.
-- `(window stream duration aggregate)` — rolling window evaluation. The duration string is parsed by `parseDuration` and accepts suffixes like `ms`, `s`, `min`, `h`, `d`.
+- `(window stream duration aggregate)` — rolling window evaluation. The duration string is parsed by `parseDuration` and accepts suffixes `ms`, `s`, `min`, `m`, `h`, `d`. `window` rejects a zero-length duration.
 - `(prefix stream aggregate)` — accumulate values using the stream’s initial value as the seed.
 - `(bucketize stream duration aggregate)` — group datapoints into fixed windows, then aggregate each bucket. Helpers like `buckets` and `buckets-count` in the common library wrap this.
+- `(bucketize-months stream months aggregate)` — group datapoints into calendar-month buckets instead of fixed millisecond windows. `months` is a numeric month count.
+- `(shift duration stream)` — shift every datapoint timestamp by the parsed duration. Positive durations move points forward in time; negative durations move them backward.
+- `(before-now)` — returns a predicate function that keeps datapoints whose timestamp is earlier than the current clock time. It is intended for use inside `filter`.
 - `(filter stream predicate)` — keep datapoints when the predicate returns truthy. Predicate receives `(value datapoint)`.
 - `(map stream fn1 fn2 ...)` — sequentially apply mapper functions. A mapper may return either a raw number or a full datapoint.
 - `(compose stream1 stream2 ... aggregate)` — merge multiple streams on timestamp and feed the aligned values to an aggregate lambda.
@@ -95,8 +98,12 @@ Call `compute(client, COMMON_LIBRARY, program)` to preload these helpers before 
 
 ## Error handling
 - Unknown symbols throw `Undefined symbol` errors.
-- Duration parsing rejects zero/unknown units.
+- `parseDuration` accepts `ms`, `s`, `min`, `m`, `h`, and `d`. If no duration tokens match, it returns `0`.
+- Zero-duration handling depends on the caller:
+  - `window` explicitly rejects `0`
+  - `shift` allows `0`
+  - other duration-based operations delegate to the underlying series/model logic and may fail there
 - Built-ins validate argument types (e.g., `window` requires a stream and aggregate function).
 
 ## Testing
-PulseLang evaluation is covered by `tests/dsl/interpreter.test.ts`, which uses Vitest and synthetic streams to assert that the DSL produces expected series. Run `npm run test` inside `client-sdks/typescript/` while iterating on the interpreter or docs.
+PulseLang evaluation is covered by `client-sdks/typescript/tests/dsl/interpreter.test.ts`, which uses Vitest and synthetic streams to assert that the DSL produces expected series. Run `npm run test` inside `client-sdks/typescript/` while iterating on the interpreter or docs.

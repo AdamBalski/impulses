@@ -171,6 +171,131 @@ export const api = {
     }
   },
 
+  async listCharts() {
+    try {
+      const response = await fetch(`${API_BASE}/chart`, {
+        credentials: includeCredentials,
+      });
+      return handleResponse(response);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Network error: Unable to connect to server', 0, null);
+    }
+  },
+
+  async createChart(payload) {
+    try {
+      const response = await fetch(`${API_BASE}/chart`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: includeCredentials,
+        body: JSON.stringify(payload),
+      });
+      return handleResponse(response);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Network error: Unable to connect to server', 0, null);
+    }
+  },
+
+  async updateChart(chartId, payload) {
+    try {
+      const response = await fetch(`${API_BASE}/chart/${chartId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: includeCredentials,
+        body: JSON.stringify(payload),
+      });
+      return handleResponse(response);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Network error: Unable to connect to server', 0, null);
+    }
+  },
+
+  async deleteChart(chartId) {
+    try {
+      const response = await fetch(`${API_BASE}/chart/${chartId}`, {
+        method: 'DELETE',
+        credentials: includeCredentials,
+      });
+      return handleResponse(response);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Network error: Unable to connect to server', 0, null);
+    }
+  },
+
+  async listDashboards() {
+    try {
+      const response = await fetch(`${API_BASE}/dashboard`, {
+        credentials: includeCredentials,
+      });
+      return handleResponse(response);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Network error: Unable to connect to server', 0, null);
+    }
+  },
+
+  async createDashboard(payload) {
+    try {
+      const response = await fetch(`${API_BASE}/dashboard`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: includeCredentials,
+        body: JSON.stringify(payload),
+      });
+      return handleResponse(response);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Network error: Unable to connect to server', 0, null);
+    }
+  },
+
+  async updateDashboard(dashboardId, payload) {
+    try {
+      const response = await fetch(`${API_BASE}/dashboard/${dashboardId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: includeCredentials,
+        body: JSON.stringify(payload),
+      });
+      return handleResponse(response);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Network error: Unable to connect to server', 0, null);
+    }
+  },
+
+  async deleteDashboard(dashboardId) {
+    try {
+      const response = await fetch(`${API_BASE}/dashboard/${dashboardId}`, {
+        method: 'DELETE',
+        credentials: includeCredentials,
+      });
+      return handleResponse(response);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Network error: Unable to connect to server', 0, null);
+    }
+  },
+
+  async importLocalChartDashboardBundle(payload) {
+    try {
+      const response = await fetch(`${API_BASE}/dashboard/import-local-bundle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: includeCredentials,
+        body: JSON.stringify(payload),
+      });
+      return handleResponse(response);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Network error: Unable to connect to server', 0, null);
+    }
+  },
+
   async listTokens() {
     try {
       const response = await fetch(`${API_BASE}/token`, {
@@ -278,6 +403,85 @@ export const api = {
     try {
       const response = await fetch(`${API_BASE}/local-storage/${entryId}`, {
         method: 'DELETE',
+        credentials: includeCredentials,
+      });
+      return handleResponse(response);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Network error: Unable to connect to server', 0, null);
+    }
+  },
+
+  async listLlmModels() {
+    try {
+      const response = await fetch(`${API_BASE}/ai/models`, {
+        credentials: includeCredentials,
+      });
+      return handleResponse(response);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Network error: Unable to connect to server', 0, null);
+    }
+  },
+
+  async createLlmModel(payload) {
+    try {
+      const response = await fetch(`${API_BASE}/ai/models`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: includeCredentials,
+        body: JSON.stringify(payload),
+      });
+      return handleResponse(response);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Network error: Unable to connect to server', 0, null);
+    }
+  },
+
+  async updateLlmModel(modelId, payload) {
+    try {
+      const response = await fetch(`${API_BASE}/ai/models/${modelId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: includeCredentials,
+        body: JSON.stringify(payload),
+      });
+      return handleResponse(response);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Network error: Unable to connect to server', 0, null);
+    }
+  },
+
+  async deleteLlmModel(modelId) {
+    try {
+      const response = await fetch(`${API_BASE}/ai/models/${modelId}`, {
+        method: 'DELETE',
+        credentials: includeCredentials,
+      });
+      return handleResponse(response);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Network error: Unable to connect to server', 0, null);
+    }
+  },
+
+  async listChats() {
+    try {
+      const response = await fetch(`${API_BASE}/ai/chats`, {
+        credentials: includeCredentials,
+      });
+      return handleResponse(response);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Network error: Unable to connect to server', 0, null);
+    }
+  },
+
+  async getChat(chatId) {
+    try {
+      const response = await fetch(`${API_BASE}/ai/chats/${chatId}`, {
         credentials: includeCredentials,
       });
       return handleResponse(response);

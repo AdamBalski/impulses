@@ -4,7 +4,7 @@ WORKDIR /app
 
 ENV PORT=8000
 ENV GOOGLE_OAUTH2_CREDS={}
-ENV ORIGIN=http://localhost:3000
+ENV ORIGIN=http://localhost:3001
 ENV ORIGIN_API=http://localhost:8000
 ENV SESSION_TTL_SEC=1800
 ENV SQLITE_DB_PATH=/app/server/data-store/impulses.sqlite3

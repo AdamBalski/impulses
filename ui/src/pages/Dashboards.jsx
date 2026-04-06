@@ -6,14 +6,8 @@ import DashboardLayout from '../components/DashboardLayout';
 import DashboardPicker from '../components/DashboardPicker';
 import DashboardEditor from '../components/DashboardEditor';
 import DashboardZoomControls from '../components/DashboardZoomControls';
-import { loadChartsFromStorage } from '../lib/chartStorage';
-import {
-  loadDashboardsFromStorage,
-  saveDashboard,
-  deleteDashboard,
-  copyDashboard,
-  createDashboard,
-} from '../lib/dashboardStorage';
+import { normalizeChart, normalizeDashboard, toDashboardBody } from '../lib/visualizationModel';
+import { api } from '../api';
 
 export default function Dashboards() {
   const { dashboardId } = useParams();
@@ -21,17 +15,48 @@ export default function Dashboards() {
 
   const [chartsMap, setChartsMap] = useState({});
   const [dashboardsMap, setDashboardsMap] = useState({});
+  const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [globalZoomCommand, setGlobalZoomCommand] = useState(null);
   const [dashboardSeriesData, setDashboardSeriesData] = useState({});
   const [dashboardDataLoading, setDashboardDataLoading] = useState(false);
   const [dashboardDataError, setDashboardDataError] = useState('');
+  const [error, setError] = useState('');
   const lastComputedProgramRef = useRef(null);
 
   useEffect(() => {
-    setChartsMap(loadChartsFromStorage());
-    setDashboardsMap(loadDashboardsFromStorage());
+    loadVisualizations();
   }, []);
+
+  async function loadVisualizations() {
+    try {
+      setLoading(true);
+      const [charts, dashboards] = await Promise.all([
+        api.listCharts(),
+        api.listDashboards(),
+      ]);
+
+      const nextChartsMap = {};
+      for (const chart of charts || []) {
+        const normalized = normalizeChart(chart);
+        nextChartsMap[normalized.id] = normalized;
+      }
+
+      const nextDashboardsMap = {};
+      for (const dashboard of dashboards || []) {
+        const normalized = normalizeDashboard(dashboard);
+        nextDashboardsMap[normalized.id] = normalized;
+      }
+
+      setChartsMap(nextChartsMap);
+      setDashboardsMap(nextDashboardsMap);
+      setError('');
+    } catch (err) {
+      setError(err.message || 'Failed to load dashboards');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const currentDashboard = dashboardId ? dashboardsMap[dashboardId] : null;
 
@@ -98,37 +123,64 @@ export default function Dashboards() {
     });
   }
 
-  function handleNewDashboard() {
-    const newDashboard = createDashboard();
-    saveDashboard(newDashboard);
-    setDashboardsMap(loadDashboardsFromStorage());
-    navigate(`/dashboards/${newDashboard.id}`);
-    setIsEditing(true);
+  async function handleNewDashboard() {
+    try {
+      const newDashboard = await api.createDashboard({
+        name: 'Unnamed',
+        description: '',
+        program: '',
+        default_zoom_window: null,
+        override_chart_zoom: false,
+        layout: [],
+      });
+      await loadVisualizations();
+      navigate(`/dashboards/${newDashboard.id}`);
+      setIsEditing(true);
+    } catch (err) {
+      setError(err.message || 'Failed to create dashboard');
+    }
   }
 
   function handleToggleEdit() {
     setIsEditing(!isEditing);
   }
 
-  function handleSave(updatedDashboard) {
-    saveDashboard(updatedDashboard);
-    setDashboardsMap(loadDashboardsFromStorage());
-    setIsEditing(false);
+  async function handleSave(updatedDashboard) {
+    try {
+      await api.updateDashboard(updatedDashboard.id, toDashboardBody(updatedDashboard));
+      await loadVisualizations();
+      setIsEditing(false);
+    } catch (err) {
+      setError(err.message || 'Failed to save dashboard');
+    }
   }
 
-  function handleDelete(id) {
-    deleteDashboard(id);
-    setDashboardsMap(loadDashboardsFromStorage());
-    setIsEditing(false);
-    navigate('/dashboards');
+  async function handleDelete(id) {
+    try {
+      await api.deleteDashboard(id);
+      await loadVisualizations();
+      setIsEditing(false);
+      navigate('/dashboards');
+    } catch (err) {
+      setError(err.message || 'Failed to delete dashboard');
+    }
   }
 
-  function handleCopy(id) {
-    const copied = copyDashboard(id);
-    if (copied) {
-      setDashboardsMap(loadDashboardsFromStorage());
+  async function handleCopy(id) {
+    const original = dashboardsMap[id];
+    if (!original) {
+      return;
+    }
+    try {
+      const copied = await api.createDashboard({
+        ...toDashboardBody(original),
+        name: `${original.name} (copy)`,
+      });
+      await loadVisualizations();
       navigate(`/dashboards/${copied.id}`);
       setIsEditing(true);
+    } catch (err) {
+      setError(err.message || 'Failed to copy dashboard');
     }
   }
 
@@ -138,8 +190,14 @@ export default function Dashboards() {
 
   const hasDashboards = Object.keys(dashboardsMap).length > 0;
 
+  if (loading) {
+    return <div className="loading">Loading dashboards...</div>;
+  }
+
   return (
     <div>
+      {error && <div className="error">{error}</div>}
+
       <DashboardPicker
         dashboards={dashboardsMap}
         onNew={handleNewDashboard}

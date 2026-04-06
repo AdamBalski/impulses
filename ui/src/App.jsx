@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
+import { AppWebSocketProvider } from './contexts/AppWebSocketContext';
 import { UserSettingsProvider } from './contexts/UserSettingsContext';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -12,6 +13,8 @@ import Charts from './pages/Charts';
 import Dashboards from './pages/Dashboards';
 import LocalStorageSync from './pages/LocalStorageSync';
 import Settings from './pages/Settings';
+import Chat from './pages/Chat';
+import LlmModels from './pages/LlmModels';
 
 const BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '');
 const FAVICON_URL = `${import.meta.env.BASE_URL}favicon.svg`;
@@ -58,6 +61,8 @@ function Navigation() {
         <Link to="/gcal">GCal integration</Link>
         <Link to="/dashboards">Dashboards</Link>
         <Link to="/charts">Charts</Link>
+        <Link to="/chat">Chat</Link>
+        <Link to="/models">Models</Link>
         <Link to="/storage-sync">Storage Sync</Link>
         <Link to="/settings">Settings</Link>
       </div>
@@ -135,6 +140,21 @@ function AppContent() {
             <LocalStorageSync />
           </ProtectedRoute>
         } />
+        <Route path="/chat" element={
+          <ProtectedRoute>
+            <Chat />
+          </ProtectedRoute>
+        } />
+        <Route path="/chat/:chatId" element={
+          <ProtectedRoute>
+            <Chat />
+          </ProtectedRoute>
+        } />
+        <Route path="/models" element={
+          <ProtectedRoute>
+            <LlmModels />
+          </ProtectedRoute>
+        } />
         <Route path="/settings" element={
           <ProtectedRoute>
             <Settings />
@@ -151,9 +171,11 @@ export default function App() {
   return (
     <BrowserRouter basename={BASENAME}>
       <AuthProvider>
-        <UserSettingsProvider>
-          <AppContent />
-        </UserSettingsProvider>
+        <AppWebSocketProvider>
+          <UserSettingsProvider>
+            <AppContent />
+          </UserSettingsProvider>
+        </AppWebSocketProvider>
       </AuthProvider>
     </BrowserRouter>
   );

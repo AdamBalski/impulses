@@ -1,0 +1,25 @@
+#!/bin/bash
+set -euo pipefail
+
+if [ "$#" -ne 1 ]; then
+  echo "Usage: ./sandbox/sql '<sql>'" >&2
+  exit 1
+fi
+
+SQL_QUERY="$1"
+CONTAINER_NAME="${IMPULSES_SQL_CONTAINER:-impulses-app}"
+
+docker exec -i "$CONTAINER_NAME" python3 - "$SQL_QUERY" <<'PY'
+import json
+import os
+import sqlite3
+import sys
+
+sql = sys.argv[1]
+db_path = os.environ.get("SQLITE_DB_PATH", "/app/server/data-store/impulses.sqlite3")
+
+with sqlite3.connect(db_path) as conn:
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(sql).fetchall()
+    print(json.dumps([dict(row) for row in rows], indent=2, ensure_ascii=True))
+PY

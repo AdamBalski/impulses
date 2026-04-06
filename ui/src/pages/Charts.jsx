@@ -3,8 +3,9 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { format as formatPulseProgram } from '@impulses/sdk-typescript';
 import Chart from '../components/Chart';
 import { DISPLAY_TYPE_OPTIONS, DISPLAY_TYPE_DEFAULT } from '../lib/displayTypes';
+import { normalizeChart, toChartBody } from '../lib/visualizationModel';
+import { api } from '../api';
 
-const STORAGE_KEY = 'impulses_charts';
 const DEFAULT_COLOR = '#0066cc';
 
 const RESOLUTION_OPTIONS = [
@@ -22,24 +23,6 @@ const ROLLUP_OPTIONS = [
   { value: 'min', label: 'Min' },
   { value: 'max', label: 'Max' },
 ];
-
-function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
-}
-
-function loadChartsFromStorage() {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return {};
-    return JSON.parse(stored);
-  } catch {
-    return {};
-  }
-}
-
-function saveChartsToStorage(chartsMap) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(chartsMap));
-}
 
 function ChartForm({
   title,
@@ -281,7 +264,9 @@ export default function Charts() {
   const { chartId } = useParams();
   const navigate = useNavigate();
 
-  const [chartsMap, setChartsMap] = useState(loadChartsFromStorage);
+  const [chartsMap, setChartsMap] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
 
   const charts = Object.values(chartsMap);
@@ -297,15 +282,27 @@ export default function Charts() {
   const [formDefaultZoomWindow, setFormDefaultZoomWindow] = useState('');
   const [isCreatingNew, setIsCreatingNew] = useState(false);
 
-  const isInitialMount = useRef(true);
-
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
+    loadCharts();
+  }, []);
+
+  async function loadCharts() {
+    try {
+      setLoading(true);
+      const data = await api.listCharts();
+      const nextMap = {};
+      for (const chart of data || []) {
+        const normalized = normalizeChart(chart);
+        nextMap[normalized.id] = normalized;
+      }
+      setChartsMap(nextMap);
+      setError('');
+    } catch (err) {
+      setError(err.message || 'Failed to load charts');
+    } finally {
+      setLoading(false);
     }
-    saveChartsToStorage(chartsMap);
-  }, [chartsMap]);
+  }
 
   function resetForm() {
     setFormName('');
@@ -361,64 +358,66 @@ export default function Charts() {
     setFormVariables(updated);
   }
 
-  function upsertChart(chartData) {
-    setChartsMap(prev => ({
-      ...prev,
-      [chartData.id]: chartData,
-    }));
-  }
-
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
+    try {
+      setError('');
+      const payload = toChartBody({
+        name: formName,
+        description: formDescription,
+        program: formProgram,
+        variables: formVariables,
+        formatYAsDurationMs: formFormatYAsDurationMs,
+        interpolateToLatest: formInterpolateToLatest,
+        cutFutureDatapoints: formCutFutureDatapoints,
+        defaultZoomWindow: formDefaultZoomWindow,
+      });
 
-    const newId = isCreatingNew ? generateId() : currentChart?.id;
-    const chartData = {
-      id: newId,
-      name: formName,
-      description: formDescription,
-      program: formProgram,
-      variables: formVariables
-        .filter(v => v.variable.trim())
-        .map(v => ({
-          ...v,
-          useRightAxis: !!v.useRightAxis,
-        })),
-      formatYAsDurationMs: !!formFormatYAsDurationMs,
-      interpolateToLatest: !!formInterpolateToLatest,
-      cutFutureDatapoints: !!formCutFutureDatapoints,
-      defaultZoomWindow: formDefaultZoomWindow.trim() || null,
-      createdAt: isCreatingNew ? Date.now() : (currentChart?.createdAt || Date.now()),
-      updatedAt: Date.now(),
-    };
+      if (isCreatingNew) {
+        const created = await api.createChart(payload);
+        await loadCharts();
+        resetForm();
+        navigate(`/charts/${created.id}`);
+        return;
+      }
 
-    upsertChart(chartData);
-    resetForm();
+      if (!currentChart) {
+        setError('Chart not found');
+        return;
+      }
 
-    if (isCreatingNew) {
-      navigate(`/charts/${newId}`);
+      await api.updateChart(currentChart.id, payload);
+      await loadCharts();
+      resetForm();
+    } catch (err) {
+      setError(err.message || 'Failed to save chart');
     }
   }
 
-  function handleDelete(id) {
-    if (confirm('Delete this chart?')) {
-      setChartsMap(prev => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      });
+  async function handleDelete(id) {
+    if (!confirm('Delete this chart?')) {
+      return;
+    }
+    try {
+      await api.deleteChart(id);
+      await loadCharts();
       resetForm();
       navigate('/charts');
+    } catch (err) {
+      setError(err.message || 'Failed to delete chart');
     }
-  }
-
-  function handleUpdate(updatedChart) {
-    upsertChart(updatedChart);
   }
 
   const hasCharts = charts.length > 0;
 
+  if (loading) {
+    return <div className="loading">Loading charts...</div>;
+  }
+
   return (
     <div>
+      {error && <div className="error">{error}</div>}
+
       {/* Chart Picker */}
       <div className="dashboard-picker">
         <div className="dashboard-tabs">
@@ -526,7 +525,7 @@ export default function Charts() {
         <div className="chart-wrapper">
           <Chart
             chart={currentChart}
-            onUpdate={handleUpdate}
+            onUpdate={() => {}}
             onDelete={handleDelete}
           />
         </div>

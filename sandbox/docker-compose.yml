@@ -10,7 +10,7 @@ services:
       SQLITE_DB_PATH: /app/server/data-store/impulses.sqlite3
       SESSION_TTL_SEC: 1800
       PORT: 8000
-      ORIGIN: ${ORIGIN:-http://localhost:3000}
+      ORIGIN: ${ORIGIN:-http://localhost:3001}
       ORIGIN_API: ${ORIGIN_API:-http://localhost:8000}
       GOOGLE_OAUTH2_CREDS: "{}"
     volumes:
@@ -23,19 +23,25 @@ services:
   ui:
     build:
       context: ..
-      dockerfile: ./Dockerfile.ui
-      args:
-        VITE_API_URL: ${VITE_API_URL:-/impulses/api}
+      dockerfile: ./sandbox/Dockerfile.ui
     container_name: impulses-ui
+    ports:
+      - "3001:3001"
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
     volumes:
-      - ui_dist:/srv/impulses
+      - ..:/app
+      - ui_node_modules:/app/ui/node_modules
+      - sdk_node_modules:/app/client-sdks/typescript/node_modules
     networks:
       - impulses-network
 
 volumes:
   app_data:
     driver: local
-  ui_dist:
+  ui_node_modules:
+    driver: local
+  sdk_node_modules:
     driver: local
 
 networks:

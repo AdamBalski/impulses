@@ -20,11 +20,37 @@ import sys
 
 db_path = sys.argv[1]
 sql_path = pathlib.Path(sys.argv[2])
+sql_name = sql_path.name
 sql = sql_path.read_text()
 
 with sqlite3.connect(db_path) as conn:
     conn.execute("pragma foreign_keys = on")
-    conn.executescript(sql)
+    conn.execute(
+        """
+        create table if not exists schema_migration (
+            name text primary key,
+            applied_at integer not null default (strftime('%s', 'now'))
+        )
+        """
+    )
+    already_applied = conn.execute(
+        "select 1 from schema_migration where name = ?",
+        [sql_name],
+    ).fetchone()
+    if already_applied:
+        print(f"Skipping {sql_name}, already applied")
+        conn.commit()
+        raise SystemExit(0)
+
+    try:
+        conn.executescript(sql)
+    except sqlite3.OperationalError as exc:
+            raise
+
+    conn.execute(
+        "insert into schema_migration(name) values (?)",
+        [sql_name],
+    )
     conn.commit()
 PY
         echo "✓ $(basename "$sql_file") applied successfully"

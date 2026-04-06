@@ -149,29 +149,18 @@ export default function Chart({
   const shouldCutFuture = !!chart.cutFutureDatapoints;
 
   const variables = useMemo(() => {
-    let vars;
-    if (Array.isArray(chart.variables) && chart.variables.length > 0) {
-      vars = chart.variables.map((variable) => ({
-        ...variable,
-        displayType: variable.displayType || DISPLAY_TYPE_DEFAULT,
-        useRightAxis: Boolean(variable.useRightAxis),
-      }));
-    } else {
-      const legacy = Array.isArray(chart.impulses) ? chart.impulses : [];
-      vars = legacy.map((impulse, idx) => ({
-        variable: impulse?.impulse_expression || `series_${idx + 1}`,
-        color: impulse?.color || '#0066cc',
-        displayType: impulse?.displayType || DISPLAY_TYPE_DEFAULT,
-        useRightAxis: false,
-      }));
-    }
+    const vars = Array.isArray(chart.variables) ? chart.variables.map((variable) => ({
+      ...variable,
+      displayType: variable.displayType || DISPLAY_TYPE_DEFAULT,
+      useRightAxis: Boolean(variable.useRightAxis),
+    })) : [];
 
     return {
       list: vars,
       shouldInterpolateToLatest,
       shouldCutFuture,
     };
-  }, [chart.variables, chart.impulses, shouldInterpolateToLatest, shouldCutFuture]);
+  }, [chart.variables, shouldInterpolateToLatest, shouldCutFuture]);
 
   const useDashboardData = dashboardSeriesData !== null;
 
