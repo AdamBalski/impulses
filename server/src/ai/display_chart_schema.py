@@ -29,19 +29,30 @@ class DisplayChartVariableArgs(pydantic.BaseModel):
 class DisplayChartArgs(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(extra="forbid")
 
-    name: str
+    chart_id: str | None = None
+    name: str | None = None
     description: str | None = None
     chart_derived_from: str | None = None
-    program: str
-    variables: list[DisplayChartVariableArgs]
+    program: str | None = None
+    variables: list[DisplayChartVariableArgs] | None = None
     format_y_as_duration_ms: bool = False
     interpolate_to_latest: bool = False
     cut_future_datapoints: bool = False
     default_zoom_window: str | None = None
 
+    @pydantic.model_validator(mode="after")
+    def validate_requirements(self) -> "DisplayChartArgs":
+        if self.chart_id:
+            return self
+        if not self.name or not self.program or self.variables is None:
+            raise ValueError("When not providing chart_id, name, program, and variables are required")
+        return self
+
     @pydantic.field_validator("program")
     @classmethod
-    def validate_program(cls, value: str) -> str:
+    def validate_program(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
         if not value.strip():
             raise ValueError("Chart program must be non-empty")
         validate_pulselang(value)

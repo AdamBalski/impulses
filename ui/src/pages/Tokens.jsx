@@ -42,7 +42,7 @@ export default function Tokens() {
       });
     }
 
-    navigate('/tokens', { replace: true });
+    navigate('/settings/tokens', { replace: true });
   }, [location.search, navigate]);
 
   async function loadTokens() {

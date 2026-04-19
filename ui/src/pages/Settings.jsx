@@ -1,23 +1,30 @@
-import { useUserSettings } from '../contexts/UserSettingsContext';
+import { NavLink, Outlet } from 'react-router-dom';
+
+const SETTINGS_TABS = [
+  { to: '/settings', label: 'General', end: true },
+  { to: '/settings/tokens', label: 'Tokens' },
+  { to: '/settings/gcal-integration', label: 'GCal integration' },
+  { to: '/settings/models', label: 'Models' },
+  { to: '/settings/storage-sync', label: 'Storage sync' },
+];
 
 export default function Settings() {
-  const { hideSensitiveData, setHideSensitiveData } = useUserSettings();
-
   return (
-    <div className="card">
+    <div>
       <h2>Settings</h2>
-
-      <label className="checkbox-label">
-        <input
-          type="checkbox"
-          checked={hideSensitiveData}
-          onChange={(e) => setHideSensitiveData(e.target.checked)}
-        />
-        Hide sensitive data in charts
-      </label>
-      <p className="layout-empty-hint">
-        When enabled, numeric chart values are replaced with the text "Sensitive data".
-      </p>
+      <div className="settings-subtabs">
+        {SETTINGS_TABS.map((tab) => (
+          <NavLink
+            key={tab.to}
+            to={tab.to}
+            end={tab.end}
+            className={({ isActive }) => `settings-subtab${isActive ? ' settings-subtab--active' : ''}`}
+          >
+            {tab.label}
+          </NavLink>
+        ))}
+      </div>
+      <Outlet />
     </div>
   );
 }

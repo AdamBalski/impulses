@@ -1,3 +1,5 @@
+import os
+
 import bcrypt
 import fastapi
 import pydantic
@@ -37,8 +39,9 @@ def _to_user_dto(u: UserModel) -> UserDto:
 
 @router.post("")
 async def create_user(body: CreateUserBody,
-                      users: UserRepo = state.injected(UserRepo),
-                      app_state: state.AppState = fastapi.Depends(state.get_state)) -> UserDto:
+                      users: UserRepo = state.injected(UserRepo)) -> UserDto:
+    if os.getenv("ALLOW_CREATE_USER", "").lower() != "true":
+        raise fastapi.HTTPException(status_code=503, detail="User registration is disabled")
     role = body.role.upper()
     if role not in ("ADMIN", "STANDARD"):
         raise fastapi.HTTPException(status_code=422, detail="role must be ADMIN or STANDARD")

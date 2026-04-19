@@ -172,6 +172,32 @@ th {
   margin: 1em 0;
 }
 
+.settings-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6em;
+  margin: 1em 0 1.5em;
+}
+
+.settings-subtab {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.45em 0.8em;
+  border: 2px solid #222;
+  font-weight: 700;
+  text-decoration: none;
+  background: #fff;
+}
+
+.settings-subtab--active {
+  background: #222;
+  color: #fff;
+}
+
+.settings-subtab--active:hover {
+  color: #fff;
+}
+
 .loading {
   text-align: center;
   padding: 2em;

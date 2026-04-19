@@ -1,6 +1,9 @@
 import { useAuth } from '../AuthContext';
 import { Link } from 'react-router-dom';
 
+const TYPESCRIPT_SDK_URL = 'https://github.com/AdamBalski/impulses/tree/main/client-sdks/typescript';
+const PYTHON_SDK_URL = 'https://github.com/AdamBalski/impulses/tree/main/client-sdks/python3';
+
 export default function Dashboard() {
   const { user } = useAuth();
 
@@ -13,44 +16,88 @@ export default function Dashboard() {
       <div className="card">
         <h3>What is Impulses?</h3>
         <p>
-          Impulses is a system for tracking user-defined metrics. Store datapoints,
-          query them, and analyze trends over time.
+          Impulses is a personal metrics and analysis system. It is meant for collecting
+          streams of datapoints, querying them later, and building derived views over them
+          with charts, dashboards, and PulseLang.
         </p>
         <p>
-          Use the Python SDK to perform operations like filter, map, sliding window,
-          and prefix operations on your metric data.
+          A metric is just a named stream of timestamped numeric datapoints with arbitrary
+          string dimensions. That means you can store things like transactions, balances,
+          weights, steps, latency samples, event counters, or any other time-series data
+          you want to inspect later.
         </p>
       </div>
 
       <div className="card">
-        <h3>Quick Start</h3>
-        <ol>
-          <li><Link to="/tokens">Create a SUPER token</Link> and save it for metrics use</li>
-          <li><Link to="/metrics">View your metrics</Link> or add new datapoints</li>
-          <li>Use the Python SDK with your token to fetch and analyze data</li>
-        </ol>
-        <p><strong>Note:</strong> The Metrics page requires a SUPER token to be stored. Create one in the Tokens page and click "Save for Metrics Use".</p>
+        <h3>Tokens</h3>
+        <p>
+          Tokens are required for all API and SDK access. If you want to ingest data,
+          fetch metrics, or use the SDKs, create a token first in{' '}
+          <Link to="/settings/tokens">Settings → Tokens</Link>.
+        </p>
+        <p>
+          For metrics work in the UI, create a <strong>SUPER</strong> token and save it
+          for metrics use.
+        </p>
       </div>
 
       <div className="card">
-        <h3>Example Usage</h3>
-        <pre><code>{`from impulses_sdk import ImpulsesClient
-from impulses_sdk import operations
+        <h3>Metrics</h3>
+        <p>
+          Metrics are your raw stored data. Each metric is a named stream of datapoints,
+          and each datapoint has a timestamp, a numeric value, and optional dimensions.
+        </p>
+        <p>
+          Use <Link to="/metrics">Metrics</Link> to inspect stored streams and add new
+          datapoints manually.
+        </p>
+      </div>
 
-# Connect
-client = ImpulsesClient("http://localhost:8000", "your-token")
+      <div className="card">
+        <h3>Charts</h3>
+        <p>
+          Charts turn raw metrics into reusable visual definitions. A chart contains a
+          PulseLang program plus rendering settings, so it can express filtered views,
+          rolling windows, ratios, aggregates, and other derived series.
+        </p>
+        <p>
+          Use <Link to="/charts">Charts</Link> to create, inspect, and edit those views.
+        </p>
+      </div>
 
-# Fetch data
-deltas = client.fetch_datapoints("transactions")
+      <div className="card">
+        <h3>Dashboards</h3>
+        <p>
+          Dashboards arrange multiple charts into one layout. They are for combining
+          related charts into one place so you can inspect a larger story at once.
+        </p>
+        <p>
+          Use <Link to="/dashboards">Dashboards</Link> to build and browse those layouts.
+        </p>
+      </div>
 
-# Compute prefix sum
-balance = operations.prefix_op(deltas, sum)
+      <div className="card">
+        <h3>Chat</h3>
+        <p>
+          Chat is the read-only Pulse Wizard interface. It can inspect your saved charts,
+          dashboards, metrics, and PulseLang definitions, and it can also propose charts
+          visually for you to save.
+        </p>
+        <p>
+          Use <Link to="/chat">Chat</Link> after configuring at least one model in{' '}
+          <Link to="/settings/models">Settings → Models</Link>.
+        </p>
+      </div>
 
-# Filter
-expenses = deltas.filter(lambda dp: dp.value < 0)
-
-# Sliding window (30 days)
-expenses_30d = operations.sliding_window(expenses, 30, sum)`}</code></pre>
+      <div className="card">
+        <h3>SDKs</h3>
+        <p>
+          Use the SDKs to push data into Impulses and compute over it programmatically.
+        </p>
+        <ol>
+          <li><a href={TYPESCRIPT_SDK_URL} target="_blank" rel="noreferrer">TypeScript SDK on GitHub</a></li>
+          <li><a href={PYTHON_SDK_URL} target="_blank" rel="noreferrer">Python SDK on GitHub</a></li>
+        </ol>
       </div>
     </div>
   );

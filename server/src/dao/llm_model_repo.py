@@ -11,7 +11,7 @@ import pydantic
 from src.db.sqlite import SqlitePool
 
 
-_HEADER_NAME_RE = r"^[A-Za-z0-9-]+$"
+_HEADER_NAME_RE = r"^[A-Za-z0-9_-]+$"
 _LOCALHOST_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 

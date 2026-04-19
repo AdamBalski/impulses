@@ -85,6 +85,8 @@ async def create_model(
     model_name = body.model.strip()
     if not model_name:
         raise fastapi.HTTPException(status_code=422, detail="Model name is required")
+    if not body.settings.is_localhost:
+        raise fastapi.HTTPException(status_code=503, detail="Creation of non-localhost models is disabled as of now")
     model = repo.create_model(u.id, model_name, _to_settings(body.settings))
     return _to_dto(model)
 
@@ -99,6 +101,8 @@ async def update_model(
     model_name = body.model.strip()
     if not model_name:
         raise fastapi.HTTPException(status_code=422, detail="Model name is required")
+    if not body.settings.is_localhost:
+        raise fastapi.HTTPException(status_code=503, detail="Creation of non-localhost models is disabled as of now")
     model = repo.update_model(u.id, model_id, model_name, _to_settings(body.settings))
     if not model:
         raise fastapi.HTTPException(status_code=404, detail="Model not found")

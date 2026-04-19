@@ -5,7 +5,13 @@ import Chart from '../components/Chart';
 import ChatMarkdown from '../components/ChatMarkdown';
 import { useAppWebSocket } from '../contexts/AppWebSocketContext';
 import { loadAiChatSettings, saveAiChatSettings } from '../lib/aiChatSettings';
-import { normalizeChart, normalizeDisplayChart, toChartBody } from '../lib/visualizationModel';
+import {
+  normalizeChart,
+  normalizeDisplayChart,
+  toChartBody,
+  toDisplayChartMetadataJson,
+  toDisplayChartMetadataPayload,
+} from '../lib/visualizationModel';
 
 const NEW_CHAT_VALUE = '__new__';
 const PENDING_USER_ID = 'pending-user';
@@ -150,13 +156,6 @@ function formatJson(value) {
   } catch {
     return String(value);
   }
-}
-
-function buildProgramPreview(chart) {
-  return {
-    ...chart,
-    ...(chart?.program ? { program: '[PROGRAM]' } : {}),
-  };
 }
 
 function buildLineDiff(beforeText, afterText) {
@@ -404,30 +403,47 @@ function MessageMeta({ message }) {
 }
 
 function DisplayChartMeta({ displayChart, existingCharts }) {
-  const chart = displayChart.chart || {};
+  const chart = normalizeDisplayChart(displayChart.chart || {});
   const program = typeof chart.program === 'string' ? chart.program : '';
-  const previewChart = buildProgramPreview(chart);
-  const derivedFromId = chart.chart_derived_from || chart.chartDerivedFrom || null;
-  const baseChart = derivedFromId
+  const derivedFromId = chart.chartDerivedFrom || null;
+  const baseChartCandidate = derivedFromId
     ? existingCharts.find((candidate) => candidate.id === derivedFromId) || null
     : null;
-  const basePreviewChart = baseChart ? buildProgramPreview(baseChart) : null;
+  const baseChart = baseChartCandidate ? normalizeDisplayChart(baseChartCandidate) : null;
+  const previewChart = toDisplayChartMetadataPayload({
+    ...chart,
+    program: program ? '[PROGRAM]' : '',
+  });
+  const basePreviewChart = baseChart
+    ? toDisplayChartMetadataPayload({
+      ...baseChart,
+      program: typeof baseChart.program === 'string' && baseChart.program ? '[PROGRAM]' : '',
+    })
+    : null;
+  const previewJson = JSON.stringify(previewChart, null, 2);
+  const basePreviewJson = basePreviewChart ? JSON.stringify(basePreviewChart, null, 2) : null;
+  const programTitle = baseChart && typeof baseChart.program === 'string'
+    ? 'Program diff'
+    : 'Program';
 
   return (
     <div className="chat-message-meta" tabIndex={0}>
       <span className="chat-message-meta-icon" aria-label="Displayed chart parameters">i</span>
       <div className="chat-message-meta-popover chat-message-meta-popover--wide">
         <div className="chat-message-meta-title">Display Chart Parameters</div>
-        {basePreviewChart ? (
-          <DiffBlock beforeText={formatJson(basePreviewChart)} afterText={formatJson(previewChart)} />
+        {basePreviewJson ? (
+          <DiffBlock beforeText={basePreviewJson} afterText={previewJson} />
         ) : (
           <pre className="chat-message-meta-json">
-            <code>{formatJson(previewChart)}</code>
+            <code>{toDisplayChartMetadataJson({
+              ...chart,
+              program: program ? '[PROGRAM]' : '',
+            })}</code>
           </pre>
         )}
         {program ? (
           <>
-            <div className="chat-message-meta-title chat-message-meta-title--program">Program</div>
+            <div className="chat-message-meta-title chat-message-meta-title--program">{programTitle}</div>
             {baseChart && typeof baseChart.program === 'string' ? (
               <DiffBlock beforeText={baseChart.program} afterText={program} />
             ) : (

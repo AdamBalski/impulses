@@ -49,10 +49,14 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "display_chart",
-            "description": "Display a chart visually in the UI. Pass a full chart payload without id or timestamps when you want the user to see the chart directly. If you already fetched a saved chart, reuse its program and variables exactly instead of rewriting them.",
+            "description": "Display a chart visually in the UI. Pass a chart_id to display a saved chart exactly as is without modifying it. Pass a full chart payload (name, program, variables) when proposing a new or modified chart.",
             "parameters": {
                 "type": "object",
                 "properties": {
+                    "chart_id": {
+                        "type": "string",
+                        "description": "UUID of the saved chart to display exactly as is. If provided, other fields are optional.",
+                    },
                     "name": {"type": "string"},
                     "description": {"type": "string"},
                     "chart_derived_from": {"type": "string"},
@@ -79,7 +83,6 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                     "cut_future_datapoints": {"type": "boolean"},
                     "default_zoom_window": {"type": "string"},
                 },
-                "required": ["name", "program", "variables"],
                 "additionalProperties": False,
             },
         },
@@ -347,10 +350,21 @@ def execute_ai_tool(
         }
 
     if tool_name == "display_chart":
-        chart = DisplayChartArgs.model_validate(parsed_arguments)
+        chart_args = DisplayChartArgs.model_validate(parsed_arguments)
+        
+        if chart_args.chart_id:
+            saved_chart = chart_repo.get_chart_by_id(user_id, chart_args.chart_id)
+            if not saved_chart:
+                raise fastapi.HTTPException(status_code=404, detail="Chart not found")
+            full_chart = _chart_to_dict(saved_chart)
+            full_chart["chart_derived_from"] = chart_args.chart_derived_from or saved_chart.id
+        else:
+            full_chart = chart_args.model_dump(exclude_none=True, by_alias=True)
+
         return {
             "displayed": True,
-            "chart_name": chart.name,
+            "chart_name": full_chart.get("name") or "Chart",
+            "full_chart": full_chart,
         }
 
     if tool_name == "explain_dashboard_structure":

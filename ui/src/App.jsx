@@ -13,6 +13,7 @@ import Charts from './pages/Charts';
 import Dashboards from './pages/Dashboards';
 import LocalStorageSync from './pages/LocalStorageSync';
 import Settings from './pages/Settings';
+import GeneralSettings from './pages/GeneralSettings';
 import Chat from './pages/Chat';
 import LlmModels from './pages/LlmModels';
 
@@ -57,13 +58,9 @@ function Navigation() {
       <div className="nav-links">
         <Link to="/dashboard">Dashboard</Link>
         <Link to="/metrics">Metrics</Link>
-        <Link to="/tokens">Tokens</Link>
-        <Link to="/gcal">GCal integration</Link>
         <Link to="/dashboards">Dashboards</Link>
         <Link to="/charts">Charts</Link>
         <Link to="/chat">Chat</Link>
-        <Link to="/models">Models</Link>
-        <Link to="/storage-sync">Storage Sync</Link>
         <Link to="/settings">Settings</Link>
       </div>
       <button className="nav-logout" onClick={logout}>Logout</button>
@@ -105,16 +102,6 @@ function AppContent() {
             <MetricDetail />
           </ProtectedRoute>
         } />
-        <Route path="/tokens" element={
-          <ProtectedRoute>
-            <Tokens />
-          </ProtectedRoute>
-        } />
-        <Route path="/gcal" element={
-          <ProtectedRoute>
-            <GCalIntegration />
-          </ProtectedRoute>
-        } />
         <Route path="/charts" element={
           <ProtectedRoute>
             <Charts />
@@ -135,11 +122,6 @@ function AppContent() {
             <Dashboards />
           </ProtectedRoute>
         } />
-        <Route path="/storage-sync" element={
-          <ProtectedRoute>
-            <LocalStorageSync />
-          </ProtectedRoute>
-        } />
         <Route path="/chat" element={
           <ProtectedRoute>
             <Chat />
@@ -150,16 +132,17 @@ function AppContent() {
             <Chat />
           </ProtectedRoute>
         } />
-        <Route path="/models" element={
-          <ProtectedRoute>
-            <LlmModels />
-          </ProtectedRoute>
-        } />
         <Route path="/settings" element={
           <ProtectedRoute>
             <Settings />
           </ProtectedRoute>
-        } />
+        }>
+          <Route index element={<GeneralSettings />} />
+          <Route path="tokens" element={<Tokens />} />
+          <Route path="gcal-integration" element={<GCalIntegration />} />
+          <Route path="models" element={<LlmModels />} />
+          <Route path="storage-sync" element={<LocalStorageSync />} />
+        </Route>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Routes>
       <div style={{ height: '30px' }}></div>

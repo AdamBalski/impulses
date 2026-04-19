@@ -64,7 +64,7 @@ export default function Metrics() {
       {!hasToken && (
         <div className="error">
           <strong>No API token configured!</strong>
-          <p>You need to create a SUPER token to use metrics. Go to <Link to="/tokens">Tokens</Link> page, create a SUPER token, and save it for metrics use.</p>
+          <p>You need to create a SUPER token to use metrics. Go to <Link to="/settings/tokens">Tokens</Link>, create a SUPER token, and save it for metrics use.</p>
         </div>
       )}
 
